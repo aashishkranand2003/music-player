@@ -175,19 +175,6 @@ def get_audio_stream_url(youtube_url):
         print(f"Error getting audio stream URL: {e}")
         return None
 
-def get_local_ip():
-    try:
-        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        s.connect(("8.8.8.8", 80))
-        local_ip = s.getsockname()[0]
-        s.close()
-        return local_ip
-    except Exception:
-        return "localhost"
-
 if __name__ == '__main__':
-    server_port = 5000
-    server_ip = get_local_ip()
-    server_address = ('0.0.0.0', server_port)
-    print(f"Server running on http://{server_ip}:{server_port}")
-    socketio.run(app, host=server_address[0], port=server_address[1])
+    port = int(os.environ.get('PORT', 5000))
+    socketio.run(app, host='0.0.0.0', port=port, debug=True) 
