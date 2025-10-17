@@ -1,0 +1,10 @@
+services:
+  - type: web
+    name: music-player
+    env: python
+    buildCommand: "pip install -r requirements.txt"
+    startCommand: "gunicorn app:app --worker-class eventlet -w 1"
+    envVars:
+      - key: FLASK_SECRET_KEY
+        value: your-secret-key-here  # Set via dashboard instead
+    plan: free  # Or 'starter' for paid
