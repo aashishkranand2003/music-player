@@ -16,11 +16,28 @@
     body {
       font-family: 'Arial', sans-serif;
       background: linear-gradient(135deg, #5e4591, #6935d1);
+      background-size: 200% 200%;
+      animation: gradientShift 18s ease infinite;
       color: #fff;
       margin: 0;
       overflow: hidden;
-      transition: background 0.5s ease;
+      transition: background 0.6s ease;
       height: 100vh;
+    }
+
+    @keyframes gradientShift {
+      0% { background-position: 0% 50%; }
+      50% { background-position: 100% 50%; }
+      100% { background-position: 0% 50%; }
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    ::selection {
+      background: rgba(255, 255, 255, 0.35);
     }
 
     .app-container {
@@ -60,9 +77,13 @@
     }
 
     .search-input:focus {
-      border-color: rgba(255, 255, 255, 0.5);
+      border-color: rgba(255, 255, 255, 0.55);
       background: rgba(255, 255, 255, 0.2);
-      box-shadow: 0 0 10px rgba(255, 255, 255, 0.3);
+      box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.12), 0 0 16px rgba(255, 255, 255, 0.25);
+    }
+
+    .search-input::placeholder {
+      color: rgba(255, 255, 255, 0.6);
     }
 
     .search-icon,
@@ -114,6 +135,8 @@
       top: calc(100% + 4px);
       left: 0;
       right: 0;
+      box-shadow: 0 12px 30px rgba(0, 0, 0, 0.25);
+      animation: fadeIn 0.18s ease;
     }
 
     .search-suggestions::-webkit-scrollbar {
@@ -134,11 +157,14 @@
       align-items: center;
       padding: 12px 16px;
       cursor: pointer;
-      transition: background 0.2s ease;
+      transition: background 0.2s ease, padding-left 0.2s ease;
+      border-radius: 8px;
     }
 
-    .suggestion-item:hover {
+    .suggestion-item:hover,
+    .suggestion-item.selected {
       background: rgba(255, 255, 255, 0.25);
+      padding-left: 20px;
     }
 
     .suggestion-icon {
@@ -211,6 +237,12 @@
       display: flex;
       flex-direction: column;
       overflow: auto;
+      transition: box-shadow 0.3s ease;
+      animation: fadeIn 0.35s ease;
+    }
+
+    .player-card:hover {
+      box-shadow: 0 8px 40px rgba(0, 0, 0, 0.18);
     }
 
     .thumbnail-container {
@@ -224,6 +256,13 @@
       flex-shrink: 0;
       height: auto;
       max-height: min(50vh, 500px);
+      box-shadow: 0 10px 34px rgba(0, 0, 0, 0.28);
+      transition: transform 0.3s ease, box-shadow 0.3s ease;
+    }
+
+    .thumbnail-container:hover {
+      transform: scale(1.015);
+      box-shadow: 0 14px 40px rgba(0, 0, 0, 0.35);
     }
 
     .thumbnail {
@@ -231,6 +270,7 @@
       height: 100%;
       object-fit: cover;
       display: block;
+      animation: fadeIn 0.4s ease;
     }
 
     .thumbnail-placeholder {
@@ -259,6 +299,35 @@
       line-clamp: 2;
       -webkit-box-orient: vertical;
       max-width: 100%;
+    }
+
+    .eq-indicator {
+      display: inline-flex;
+      align-items: flex-end;
+      gap: 2px;
+      height: 14px;
+      margin-right: 6px;
+      vertical-align: middle;
+    }
+
+    .eq-indicator.hidden {
+      display: none;
+    }
+
+    .eq-indicator span {
+      width: 3px;
+      background: #ffffff;
+      border-radius: 2px;
+      animation: eqBounce 0.9s ease-in-out infinite;
+    }
+
+    .eq-indicator span:nth-child(1) { height: 6px; animation-delay: 0s; }
+    .eq-indicator span:nth-child(2) { height: 14px; animation-delay: 0.2s; }
+    .eq-indicator span:nth-child(3) { height: 9px; animation-delay: 0.4s; }
+
+    @keyframes eqBounce {
+      0%, 100% { transform: scaleY(0.4); }
+      50% { transform: scaleY(1); }
     }
 
     .artist-name {
@@ -294,9 +363,10 @@
 
     .progress-bar {
       height: 6px;
-      background: #ffffff;
+      background: linear-gradient(90deg, #ffffff, #e4d9ff);
       border-radius: 6px;
       transition: width 0.1s linear;
+      box-shadow: 0 0 8px rgba(255, 255, 255, 0.5);
     }
 
     .seek-button {
@@ -371,7 +441,25 @@
     }
 
     .play-pause-btn {
-      font-size: 32px !important;
+      font-size: 22px !important;
+      width: 56px;
+      height: 56px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(255, 255, 255, 0.18);
+      border-radius: 50%;
+      box-shadow: 0 4px 18px rgba(0, 0, 0, 0.2);
+      transition: transform 0.15s ease, background 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .play-pause-btn:hover {
+      background: rgba(255, 255, 255, 0.28);
+      transform: scale(1.08);
+    }
+
+    .play-pause-btn:active {
+      transform: scale(0.94);
     }
 
     .volume-control {
@@ -425,6 +513,7 @@
       display: flex;
       flex-direction: column;
       overflow: hidden;
+      animation: fadeIn 0.4s ease;
     }
 
     .playlist-title {
@@ -461,12 +550,22 @@
       padding: 8px;
       cursor: pointer;
       border-radius: 8px;
-      transition: background 0.2s ease;
+      transition: background 0.2s ease, transform 0.15s ease;
       flex-shrink: 0;
     }
 
     .playlist-item:hover {
       background: rgba(255, 255, 255, 0.25);
+      transform: translateX(2px);
+    }
+
+    .playlist-item-thumbnail {
+      transition: transform 0.2s ease;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+    }
+
+    .playlist-item:hover .playlist-item-thumbnail {
+      transform: scale(1.06);
     }
 
     .playlist-item-thumbnail {
@@ -506,6 +605,30 @@
 
     .hidden {
       display: none;
+    }
+
+    .connection-toast {
+      position: fixed;
+      top: 90px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 40;
+      padding: 8px 18px;
+      border-radius: 20px;
+      font-size: 13px;
+      font-weight: 500;
+      background: rgba(0, 0, 0, 0.55);
+      backdrop-filter: blur(8px);
+      border: 1px solid rgba(255, 255, 255, 0.25);
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
+      animation: fadeIn 0.25s ease;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .connection-toast.error {
+      border-color: rgba(255, 120, 120, 0.5);
     }
 
     #particles-js {
@@ -688,6 +811,7 @@
 </head>
 <body>
   <div id="particles-js"></div>
+  <div id="connection-toast" class="connection-toast hidden" role="status" aria-live="polite"></div>
   <div class="app-container">
     <div class="search-container">
       <div class="search-input-container">
@@ -713,7 +837,12 @@
                 <i class="fas fa-music"></i>
               </div>
             </div>
-            <h2 id="song-title" class="song-title">Song Title</h2>
+            <h2 id="song-title" class="song-title">
+              <span id="eq-indicator" class="eq-indicator hidden" aria-hidden="true">
+                <span></span><span></span><span></span>
+              </span>
+              <span id="song-title-text">Song Title</span>
+            </h2>
             <h3 id="artist-name" class="artist-name">Artist Name</h3>
             <div class="seek-bar">
               <div class="progress-bar" id="progress-bar" style="width: 0%"></div>
@@ -767,7 +896,7 @@
     </div>
   </div>
 
-  <script src="https://cdn.socket.io/4.0.0/socket.io.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/socket.io-client@4.8.1/dist/socket.io.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/particles.js@2.0.0/particles.min.js"></script>
   <script>
     const socket = io();
@@ -777,7 +906,8 @@
     const prevBtn = document.getElementById('prev-btn');
     const nextBtn = document.getElementById('next-btn');
     const thumbnail = document.getElementById('thumbnail');
-    const songTitle = document.getElementById('song-title');
+    const songTitle = document.getElementById('song-title-text');
+    const eqIndicator = document.getElementById('eq-indicator');
     const artistName = document.getElementById('artist-name');
     const progressBar = document.getElementById('progress-bar');
     const currentTimeLabel = document.getElementById('current-time');
@@ -816,9 +946,39 @@
     let isVolumeDragging = false;
     let isMobilePlaylistOpen = false;
 
+    // Song/artist titles come from an external API and could contain HTML
+    // special characters; always escape before inserting into innerHTML.
+    function escapeHtml(value) {
+      const div = document.createElement('div');
+      div.textContent = value === undefined || value === null ? '' : String(value);
+      return div.innerHTML;
+    }
+
+    // Safe wrappers around the Notification API: some browsers/contexts
+    // (e.g. iOS Safari, insecure origins) don't expose `Notification` at
+    // all, so touching it directly can throw a ReferenceError.
+    const hasNotificationSupport = typeof Notification !== 'undefined';
+
+    function notifyPermissionGranted() {
+      return hasNotificationSupport && Notification.permission === 'granted';
+    }
+
+    function safeNotify(title, options) {
+      if (!notifyPermissionGranted()) return;
+      try {
+        new Notification(title, options);
+      } catch (err) {
+        console.warn('Notification failed:', err);
+      }
+    }
+
     // Request notification permission
-    if (Notification && Notification.permission !== 'granted' && Notification.permission !== 'denied') {
-      Notification.requestPermission();
+    if (hasNotificationSupport && Notification.permission !== 'granted' && Notification.permission !== 'denied') {
+      try {
+        Notification.requestPermission();
+      } catch (err) {
+        console.warn('Could not request notification permission:', err);
+      }
     }
 
     // Initialize Media Session handlers
@@ -878,12 +1038,10 @@
       if ('mediaSession' in navigator) {
         navigator.mediaSession.metadata = null;
       }
-      if (Notification.permission === 'granted') {
-        new Notification('Music Player', {
-          body: 'Error loading song. Please try another.',
-          icon: '/favicon.ico'
-        });
-      }
+      safeNotify('Music Player', {
+        body: 'Error loading song. Please try another.',
+        icon: '/favicon.ico'
+      });
     });
 
     audioPlayer.addEventListener('waiting', () => {
@@ -907,6 +1065,35 @@
       playNext();
     });
 
+    // Registered once (not per-song) to avoid stacking duplicate listeners
+    // every time a new track starts playing.
+    audioPlayer.addEventListener('loadedmetadata', () => {
+      durationTimeLabel.textContent = formatTime(audioPlayer.duration);
+      if ('mediaSession' in navigator) {
+        navigator.mediaSession.setPositionState({
+          duration: audioPlayer.duration || 0,
+          playbackRate: audioPlayer.playbackRate,
+          position: audioPlayer.currentTime || 0
+        });
+      }
+    });
+
+    audioPlayer.addEventListener('timeupdate', () => {
+      if (!isDragging && !isNaN(audioPlayer.duration) && audioPlayer.duration > 0) {
+        const progress = (audioPlayer.currentTime / audioPlayer.duration) * 100;
+        progressBar.style.width = `${progress}%`;
+        seekButton.style.left = `${progress}%`;
+        currentTimeLabel.textContent = formatTime(audioPlayer.currentTime);
+        if ('mediaSession' in navigator) {
+          navigator.mediaSession.setPositionState({
+            duration: audioPlayer.duration,
+            playbackRate: audioPlayer.playbackRate,
+            position: audioPlayer.currentTime
+          });
+        }
+      }
+    });
+
     function playSong(song) {
       currentSong = song;
       shouldAutoplay = true;
@@ -915,7 +1102,9 @@
       updateSongInfo(song);
       updateMobileUpNext();
 
-      const streamUrl = `/stream/${encodeURIComponent(song.stream_url)}`;
+      const streamUrl = typeof song.stream_url === 'string' && song.stream_url.startsWith('http')
+        ? song.stream_url
+        : `/stream/${encodeURIComponent(song.stream_url)}`;
       audioPlayer.src = streamUrl;
       audioPlayer.addEventListener('canplay', function onCanPlay() {
         audioPlayer.removeEventListener('canplay', onCanPlay);
@@ -932,42 +1121,20 @@
             if ('mediaSession' in navigator) {
               navigator.mediaSession.metadata = null;
             }
-            if (Notification.permission === 'granted') {
-              new Notification('Music Player', {
-                body: 'Error streaming song. Please try again.',
-                icon: '/favicon.ico'
-              });
-            }
-          });
-        }
-      }, { once: true });
-
-      audioPlayer.addEventListener('loadedmetadata', () => {
-        durationTimeLabel.textContent = formatTime(audioPlayer.duration);
-        if ('mediaSession' in navigator) {
-          navigator.mediaSession.setPositionState({
-            duration: audioPlayer.duration || 0,
-            playbackRate: audioPlayer.playbackRate,
-            position: audioPlayer.currentTime || 0
-          });
-        }
-      }, { once: true });
-
-      audioPlayer.addEventListener('timeupdate', () => {
-        if (!isDragging) {
-          const progress = (audioPlayer.currentTime / audioPlayer.duration) * 100;
-          progressBar.style.width = `${progress}%`;
-          seekButton.style.left = `${progress}%`;
-          currentTimeLabel.textContent = formatTime(audioPlayer.currentTime);
-          if ('mediaSession' in navigator && !isNaN(audioPlayer.duration)) {
-            navigator.mediaSession.setPositionState({
-              duration: audioPlayer.duration,
-              playbackRate: audioPlayer.playbackRate,
-              position: audioPlayer.currentTime
+            safeNotify('Music Player', {
+              body: 'Error streaming song. Please try again.',
+              icon: '/favicon.ico'
             });
-          }
+          });
         }
-      });
+      }, { once: true });
+
+      // Reset the visible time immediately; the persistent 'loadedmetadata'
+      // listener (registered once, above) will fill in the real duration.
+      currentTimeLabel.textContent = '0:00';
+      durationTimeLabel.textContent = '0:00';
+      progressBar.style.width = '0%';
+      seekButton.style.left = '0%';
 
       // Update Media Session metadata
       if ('mediaSession' in navigator) {
@@ -982,8 +1149,8 @@
       }
 
       // Fallback Web Notification
-      if (Notification.permission === 'granted' && !('mediaSession' in navigator)) {
-        new Notification(song.song_title || 'Song Title', {
+      if (!('mediaSession' in navigator)) {
+        safeNotify(song.song_title || 'Song Title', {
           body: `Now Playing: ${song.artist || 'Artist Name'}`,
           icon: song.thumbnail_url || '/favicon.ico'
         });
@@ -1080,6 +1247,7 @@
 
     function updatePlayPauseButton() {
       playPauseBtn.className = isPlaying ? 'fas fa-pause play-pause-btn' : 'fas fa-play play-pause-btn';
+      eqIndicator.classList.toggle('hidden', !isPlaying);
     }
 
     function toggleMute() {
@@ -1147,10 +1315,10 @@
         const div = document.createElement('div');
         div.className = 'playlist-item';
         div.innerHTML = `
-          <img src="${lowResThumbnail}" alt="${track.title}" class="playlist-item-thumbnail" onerror="this.style.display='none';" />
+          <img src="${escapeHtml(lowResThumbnail)}" alt="${escapeHtml(track.title)}" class="playlist-item-thumbnail" onerror="this.style.display='none';" />
           <div class="playlist-item-info">
-            <div class="playlist-item-title">${track.title}</div>
-            <div class="playlist-item-artist">${track.artist}</div>
+            <div class="playlist-item-title">${escapeHtml(track.title)}</div>
+            <div class="playlist-item-artist">${escapeHtml(track.artist)}</div>
           </div>
         `;
         div.addEventListener('click', () => {
@@ -1180,12 +1348,43 @@
       updateMobileUpNext();
     }
 
+    const connectionToast = document.getElementById('connection-toast');
+    let connectionToastTimer = null;
+
+    function showConnectionToast(message, isError, autoHide) {
+      clearTimeout(connectionToastTimer);
+      connectionToast.textContent = message;
+      connectionToast.classList.toggle('error', !!isError);
+      connectionToast.classList.remove('hidden');
+      if (autoHide) {
+        connectionToastTimer = setTimeout(() => {
+          connectionToast.classList.add('hidden');
+        }, 2500);
+      }
+    }
+
+    function hideConnectionToast() {
+      clearTimeout(connectionToastTimer);
+      connectionToast.classList.add('hidden');
+    }
+
     socket.on('connect', () => {
       console.log('Connected to the server');
+      hideConnectionToast();
     });
 
     socket.on('disconnect', () => {
       console.log('Disconnected from the server');
+      showConnectionToast('Connection lost. Reconnecting…', true, false);
+    });
+
+    socket.on('connect_error', (err) => {
+      console.error('Socket connection error:', err);
+      showConnectionToast('Having trouble connecting…', true, false);
+    });
+
+    socket.io.on('reconnect', () => {
+      showConnectionToast('Reconnected', false, true);
     });
 
     socket.on('loading_song', () => {
@@ -1219,12 +1418,10 @@
       if ('mediaSession' in navigator) {
         navigator.mediaSession.metadata = null;
       }
-      if (Notification.permission === 'granted') {
-        new Notification('Music Player', {
-          body: `Error: ${error.error}`,
-          icon: '/favicon.ico'
-        });
-      }
+      safeNotify('Music Player', {
+        body: `Error: ${error.error}`,
+        icon: '/favicon.ico'
+      });
     });
 
     searchSongInput.addEventListener('keydown', (e) => {
@@ -1257,17 +1454,35 @@
       loadingIndicator.classList.add('visible');
       clearSearchBtn.classList.remove('visible');
       try {
-        const response = await fetch('/search-suggestions', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ query: query }),
-        });
-        const suggestions = await response.json();
-        displaySearchSuggestions(suggestions);
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10000);
+        let response;
+        try {
+          response = await fetch('/search-suggestions', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ query: query }),
+            signal: controller.signal,
+          });
+        } finally {
+          clearTimeout(timeoutId);
+        }
+
+        if (!response.ok) {
+          console.error('Search suggestions request failed:', response.status);
+          displaySearchSuggestions([]);
+          return;
+        }
+
+        const data = await response.json();
+        displaySearchSuggestions(Array.isArray(data) ? data : []);
       } catch (error) {
-        console.error('Error fetching suggestions:', error);
+        if (error.name !== 'AbortError') {
+          console.error('Error fetching suggestions:', error);
+        }
+        displaySearchSuggestions([]);
       } finally {
         loadingIndicator.classList.remove('visible');
         clearSearchBtn.classList.toggle('visible', searchSongInput.value.length > 0);
@@ -1276,18 +1491,25 @@
 
     function displaySearchSuggestions(suggestions) {
       searchSuggestions.innerHTML = '';
-      suggestions.forEach((song, index) => {
+      if (!suggestions || suggestions.length === 0) {
+        searchSuggestions.classList.add('hidden');
+        selectedIndex = -1;
+        return;
+      }
+      suggestions.forEach((song) => {
+        const title = song.title || 'Unknown Title';
+        const artist = song.artist || 'Unknown Artist';
         const li = document.createElement('li');
         li.className = 'suggestion-item';
         li.innerHTML = `
           <i class="fas fa-music suggestion-icon"></i>
           <div class="suggestion-text">
-            <div class="suggestion-title">${song.title}</div>
-            <div class="suggestion-artist">${song.artist}</div>
+            <div class="suggestion-title">${escapeHtml(title)}</div>
+            <div class="suggestion-artist">${escapeHtml(artist)}</div>
           </div>
         `;
         li.addEventListener('click', () => {
-          searchSongInput.value = `${song.title} - ${song.artist}`;
+          searchSongInput.value = `${title} - ${artist}`;
           clearSearchBtn.classList.add('visible');
           searchSuggestions.classList.add('hidden');
           currentPlaylist = [];
