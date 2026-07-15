@@ -4,19 +4,15 @@ import socket
 import threading
 import time
 from urllib.parse import unquote, urlparse
-
 import eventlet
-
 eventlet.monkey_patch()
-
 import requests
 from flask import Flask, Response, jsonify, render_template, request
 from flask_socketio import SocketIO, emit
 from ytmusicapi import YTMusic
-
 try:
     import yt_dlp
-except ImportError as exc:  # pragma: no cover - fail fast with a clear message
+except ImportError as exc:  
     raise RuntimeError("yt-dlp is required. Install it with: pip install yt-dlp") from exc
 
 # --------------------------------------------------------------------------
@@ -45,7 +41,6 @@ socketio = SocketIO(
     engineio_logger=False,
 )
 
-
 REQUEST_TIMEOUT = 15  # seconds
 CACHE_TIMEOUT = 500  # seconds
 CACHE_MAX_ENTRIES = 50
@@ -63,13 +58,10 @@ _cache_lock = threading.Lock()
 # --------------------------------------------------------------------------
 ytmusic = YTMusic()
 
-
 # --------------------------------------------------------------------------
 # Cache maintenance
 # --------------------------------------------------------------------------
 def _clean_stream_cache():
-    """Periodically evict expired / excess entries so the cache can't grow
-    without bound over a long-running process."""
     while True:
         eventlet.sleep(CACHE_CLEAN_INTERVAL)
         try:
@@ -79,7 +71,6 @@ def _clean_stream_cache():
                 for k in expired:
                     del stream_url_cache[k]
 
-                # Hard cap: drop oldest entries if still too large.
                 if len(stream_url_cache) > CACHE_MAX_ENTRIES:
                     by_age = sorted(stream_url_cache.items(), key=lambda kv: kv[1][1])
                     overflow = len(stream_url_cache) - CACHE_MAX_ENTRIES
@@ -90,32 +81,25 @@ def _clean_stream_cache():
         except Exception:
             logger.exception("Error while cleaning stream cache")
 
-
 # --------------------------------------------------------------------------
 # Routes
 # --------------------------------------------------------------------------
 @app.route("/")
 def index():
-    return render_template("inde.html")
-
+    return render_template("index.html")
 
 @app.route("/favicon.ico")
 def favicon():
     return "", 204
 
-
 @app.errorhandler(404)
 def not_found(_err):
     return jsonify({"error": "Not found"}), 404
-
 
 @app.errorhandler(500)
 def server_error(err):
     logger.exception("Unhandled server error: %s", err)
     return jsonify({"error": "Internal server error"}), 500
-
-
-
 
 @app.route("/stream/<path:stream_url>")
 def stream_audio(stream_url):
@@ -158,7 +142,6 @@ def stream_audio(stream_url):
         logger.exception("Unexpected streaming error")
         return jsonify({"error": "Failed to stream audio"}), 500
 
-
 @app.route("/search-suggestions", methods=["POST"])
 def search_suggestions():
     data = request.get_json(silent=True) or {}
@@ -197,7 +180,6 @@ def search_suggestions():
 
     return jsonify(suggestions)
 
-
 # --------------------------------------------------------------------------
 # Socket.IO handlers
 # --------------------------------------------------------------------------
@@ -205,11 +187,9 @@ def search_suggestions():
 def handle_connect():
     logger.info("Client connected: %s", request.sid)
 
-
 @socketio.on("disconnect")
 def handle_disconnect(reason=None):
     logger.info("Client disconnected: %s", request.sid)
-
 
 @socketio.on_error_default
 def default_error_handler(e):
@@ -218,7 +198,6 @@ def default_error_handler(e):
         emit("song_error", {"error": "Something went wrong. Please try again."})
     except Exception:
         pass
-
 
 @socketio.on("play_song")
 def play_song(data):
@@ -262,8 +241,6 @@ def play_song(data):
         emit("song_error", {"error": "Failed to get audio stream URL"}, room=request.sid)
         return
 
-    # `radio` lets the client opt out of building an autoplay queue (e.g. when
-    # it's just resuming a track that's already in its local queue/history).
     want_radio = data.get("radio", True) is not False
     playlist_tracks = (
         _get_radio_tracks(video_id, exclude_ids={video_id}, limit=INITIAL_QUEUE_SIZE)
@@ -284,9 +261,6 @@ def play_song(data):
 
 @socketio.on("extend_queue")
 def extend_queue(data):
-    """Fetch more auto-play ("radio") tracks that continue on from a seed
-    track, so the client's up-next queue can keep growing dynamically
-    instead of ever running dry - mirrors YouTube Music's endless radio."""
     if not isinstance(data, dict):
         emit("queue_extend_error", {"error": "Invalid request"}, room=request.sid)
         return
@@ -314,13 +288,8 @@ def extend_queue(data):
 
     emit("queue_extended", {"seed_video_id": video_id, "tracks": tracks}, room=request.sid)
 
-
 @socketio.on("prefetch_tracks")
 def prefetch_tracks(data):
-    """Warm the stream-url cache for a handful of upcoming queue tracks in
-    the background, so playback is instant once the user actually reaches
-    them. Fire-and-forget: no reply is sent, and failures are only logged -
-    a failed prefetch just means that track resolves normally when played."""
     if not isinstance(data, dict):
         return
 
@@ -341,10 +310,7 @@ def prefetch_tracks(data):
     for video_id in video_ids:
         socketio.start_background_task(_prefetch_stream_url, video_id)
 
-
 def _prefetch_stream_url(video_id):
-    """Resolve and cache a track's stream URL ahead of time. Runs in its own
-    greenlet so a slow/failed extraction never blocks anything else."""
     try:
         video_url = f"https://music.youtube.com/watch?v={video_id}"
         with _cache_lock:
@@ -355,10 +321,7 @@ def _prefetch_stream_url(video_id):
     except Exception:
         logger.exception("Prefetch failed for video_id=%r", video_id)
 
-
 def _format_playlist_track(track):
-    """Normalize a ytmusicapi track dict into the shape the frontend expects.
-    Returns None if the track is missing required fields."""
     t_video_id = track.get("videoId")
     if not t_video_id:
         return None
@@ -371,12 +334,7 @@ def _format_playlist_track(track):
         "thumbnailUrl": p_thumbnails[-1]["url"] if p_thumbnails else None,
     }
 
-
 def _get_radio_tracks(video_id, exclude_ids=None, limit=EXTEND_BATCH_SIZE):
-    """Ask ytmusicapi for a watch-playlist ("radio") seeded on video_id and
-    return a deduplicated, cleaned list of up-next tracks. Never raises -
-    on any failure it logs and returns an empty list so callers can degrade
-    gracefully instead of breaking playback."""
     limit = max(1, min(int(limit or EXTEND_BATCH_SIZE), MAX_RADIO_BATCH))
     seen = set(exclude_ids or ())
     tracks = []
@@ -399,7 +357,6 @@ def _get_radio_tracks(video_id, exclude_ids=None, limit=EXTEND_BATCH_SIZE):
         return []
     return tracks
 
-
 def search_youtube_music(query):
     try:
         search_results = ytmusic.search(query, filter="songs", limit=1)
@@ -420,7 +377,6 @@ def search_youtube_music(query):
         logger.exception("Error searching for song %r", query)
         return None, None, None, None, f"Error searching for song: {e}", None
 
-
 def get_audio_stream_url(youtube_url):
     try:
         current_time = time.time()
@@ -432,7 +388,7 @@ def get_audio_stream_url(youtube_url):
                 return url
 
         ydl_opts = {
-            "format": "best",
+            "format": "bestaudio/m4a/opus/best/webm",
             "quiet": True,
             "noplaylist": False,
             "http_chunk_size": 8192,
@@ -459,7 +415,6 @@ def get_audio_stream_url(youtube_url):
         logger.exception("Error getting audio stream URL for %s", youtube_url)
         return None
 
-
 def get_local_ip():
     s = None
     try:
@@ -473,13 +428,10 @@ def get_local_ip():
         if s is not None:
             s.close()
 
-
 if __name__ == "__main__":
     server_port = int(os.environ.get("PORT", 5000))
     server_ip = get_local_ip()
-
     threading.Thread(target=_clean_stream_cache, daemon=True).start()
-
     logger.info("Server running on http://%s:%s", server_ip, server_port)
     try:
         socketio.run(app, host="0.0.0.0", port=server_port)
