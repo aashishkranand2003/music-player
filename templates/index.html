@@ -170,11 +170,82 @@
     .suggestion-icon {
       margin-right: 12px;
       color: rgba(255, 255, 255, 0.8);
+      font-size: 18px;
+      width: 36px;
+      flex-shrink: 0;
+      text-align: center;
+    }
+
+    .suggestion-media {
+      width: 36px;
+      height: 36px;
+      margin-right: 12px;
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 6px;
+      overflow: hidden;
+      background: rgba(255, 255, 255, 0.12);
+    }
+
+    .suggestion-media .suggestion-icon {
+      margin-right: 0;
+      width: auto;
+    }
+
+    .suggestion-thumbnail {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
     }
 
     .suggestion-text {
       display: flex;
       flex-direction: column;
+      flex: 1;
+      min-width: 0;
+    }
+
+    .suggestion-title,
+    .suggestion-artist {
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .suggestion-add-queue {
+      flex-shrink: 0;
+      width: 30px;
+      height: 30px;
+      border: none;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.12);
+      color: rgba(255, 255, 255, 0.85);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      opacity: 0;
+      transform: scale(0.9);
+      transition: opacity 0.15s ease, transform 0.15s ease, background 0.15s ease;
+      margin-left: 8px;
+    }
+
+    .suggestion-item:hover .suggestion-add-queue,
+    .suggestion-item.selected .suggestion-add-queue {
+      opacity: 1;
+      transform: scale(1);
+    }
+
+    .suggestion-add-queue:hover {
+      background: rgba(255, 255, 255, 0.3);
+    }
+
+    .suggestion-add-queue.added {
+      background: rgba(120, 220, 150, 0.6);
+      color: #ffffff;
     }
 
     .suggestion-title {
@@ -236,7 +307,7 @@
       flex: 1;
       display: flex;
       flex-direction: column;
-      overflow: auto;
+      overflow: hidden;
       transition: box-shadow 0.3s ease;
       animation: fadeIn 0.35s ease;
     }
@@ -516,12 +587,122 @@
       animation: fadeIn 0.4s ease;
     }
 
+    .playlist-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      margin-bottom: 12px;
+      flex-shrink: 0;
+      flex-wrap: wrap;
+    }
+
+    .playlist-tabs {
+      display: flex;
+      gap: 4px;
+      background: rgba(255, 255, 255, 0.08);
+      border-radius: 999px;
+      padding: 3px;
+    }
+
+    .playlist-tab {
+      border: none;
+      background: transparent;
+      color: rgba(255, 255, 255, 0.7);
+      font-size: 13px;
+      font-weight: 600;
+      padding: 6px 12px;
+      border-radius: 999px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: background 0.2s ease, color 0.2s ease;
+      white-space: nowrap;
+    }
+
+    .playlist-tab:hover {
+      color: #ffffff;
+    }
+
+    .playlist-tab.active {
+      background: rgba(255, 255, 255, 0.28);
+      color: #ffffff;
+    }
+
     .playlist-title {
       font-size: 20px;
       font-weight: 600;
       color: #ffffff;
-      margin-bottom: 16px;
       flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .queue-count {
+      font-size: 12px;
+      font-weight: 600;
+      color: rgba(255, 255, 255, 0.85);
+      background: rgba(255, 255, 255, 0.18);
+      border-radius: 999px;
+      padding: 2px 9px;
+      min-width: 20px;
+      text-align: center;
+    }
+
+    .playlist-header-actions {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .playlist-action-btn {
+      position: relative;
+      border: none;
+      background: transparent;
+      color: rgba(255, 255, 255, 0.75);
+      width: 34px;
+      height: 34px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      font-size: 15px;
+      transition: background 0.2s ease, color 0.2s ease, transform 0.15s ease;
+    }
+
+    .playlist-action-btn:hover {
+      background: rgba(255, 255, 255, 0.18);
+      color: #ffffff;
+      transform: scale(1.06);
+    }
+
+    .playlist-action-btn:active {
+      transform: scale(0.94);
+    }
+
+    .playlist-action-btn.active {
+      color: #ffffff;
+      background: rgba(255, 255, 255, 0.3);
+    }
+
+    .repeat-one-badge {
+      position: absolute;
+      bottom: 2px;
+      right: 2px;
+      font-size: 9px;
+      font-weight: 700;
+      line-height: 1;
+      background: #ffffff;
+      color: #5e4591;
+      border-radius: 50%;
+      width: 13px;
+      height: 13px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
     }
 
     .playlist-list {
@@ -559,22 +740,43 @@
       transform: translateX(2px);
     }
 
-    .playlist-item-thumbnail {
+    .playlist-item-media {
+      width: 48px;
+      height: 48px;
+      border-radius: 6px;
+      margin-right: 12px;
+      flex-shrink: 0;
+      overflow: hidden;
+      background: rgba(255, 255, 255, 0.12);
+      display: flex;
+      align-items: center;
+      justify-content: center;
       transition: transform 0.2s ease;
       box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
     }
 
-    .playlist-item:hover .playlist-item-thumbnail {
+    .playlist-item:hover .playlist-item-media {
       transform: scale(1.06);
     }
 
     .playlist-item-thumbnail {
-      width: 48px;
-      height: 48px;
-      border-radius: 6px;
+      width: 100%;
+      height: 100%;
       object-fit: cover;
-      margin-right: 12px;
-      flex-shrink: 0;
+      display: block;
+    }
+
+    .playlist-item-media .playlist-item-icon {
+      font-size: 18px;
+      color: rgba(255, 255, 255, 0.65);
+    }
+
+    .playlist-item.history-item {
+      opacity: 0.85;
+    }
+
+    .playlist-item.history-item:hover {
+      opacity: 1;
     }
 
     .playlist-item-info {
@@ -597,6 +799,39 @@
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
+    }
+
+    .playlist-item-remove {
+      flex-shrink: 0;
+      width: 28px;
+      height: 28px;
+      border: none;
+      border-radius: 50%;
+      background: transparent;
+      color: rgba(255, 255, 255, 0.65);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      opacity: 0;
+      transition: opacity 0.15s ease, background 0.15s ease, color 0.15s ease;
+      margin-left: 4px;
+    }
+
+    .playlist-item:hover .playlist-item-remove {
+      opacity: 1;
+    }
+
+    .playlist-item-remove:hover {
+      background: rgba(255, 90, 90, 0.35);
+      color: #ffffff;
+    }
+
+    .playlist-empty {
+      text-align: center;
+      color: rgba(255, 255, 255, 0.6);
+      padding: 32px 8px;
+      font-size: 14px;
     }
 
     .selected {
@@ -871,7 +1106,28 @@
         </div>
         <div class="playlist-section">
           <div class="playlist-card">
-            <h3 class="playlist-title">Up Next</h3>
+            <div class="playlist-header">
+              <div class="playlist-tabs" role="tablist" aria-label="Playlist view">
+                <button type="button" id="queue-tab-btn" class="playlist-tab active" role="tab" aria-selected="true">
+                  Up Next <span id="queue-count" class="queue-count">0</span>
+                </button>
+                <button type="button" id="history-tab-btn" class="playlist-tab" role="tab" aria-selected="false">
+                  History <span id="history-count" class="queue-count">0</span>
+                </button>
+              </div>
+              <div class="playlist-header-actions">
+                <button type="button" id="shuffle-btn" class="playlist-action-btn" title="Shuffle queue" aria-label="Shuffle queue" aria-pressed="false">
+                  <i class="fas fa-random"></i>
+                </button>
+                <button type="button" id="repeat-btn" class="playlist-action-btn" title="Repeat off" aria-label="Repeat off">
+                  <i class="fas fa-retweet"></i>
+                  <span id="repeat-one-badge" class="repeat-one-badge hidden">1</span>
+                </button>
+                <button type="button" id="clear-queue-btn" class="playlist-action-btn" title="Clear queue" aria-label="Clear queue">
+                  <i class="fas fa-trash-alt"></i>
+                </button>
+              </div>
+            </div>
             <div id="playlist-list" class="playlist-list"></div>
           </div>
         </div>
@@ -889,7 +1145,28 @@
       <div class="mobile-playlist-view" id="mobile-playlist-view">
         <i class="fas fa-times mobile-playlist-close" id="mobile-playlist-close"></i>
         <div class="mobile-playlist-card">
-          <h3 class="playlist-title">Up Next</h3>
+          <div class="playlist-header">
+            <div class="playlist-tabs" role="tablist" aria-label="Playlist view">
+              <button type="button" id="mobile-queue-tab-btn" class="playlist-tab active" role="tab" aria-selected="true">
+                Up Next <span id="mobile-queue-count" class="queue-count">0</span>
+              </button>
+              <button type="button" id="mobile-history-tab-btn" class="playlist-tab" role="tab" aria-selected="false">
+                History <span id="mobile-history-count" class="queue-count">0</span>
+              </button>
+            </div>
+            <div class="playlist-header-actions">
+              <button type="button" id="mobile-shuffle-btn" class="playlist-action-btn" title="Shuffle queue" aria-label="Shuffle queue" aria-pressed="false">
+                <i class="fas fa-random"></i>
+              </button>
+              <button type="button" id="mobile-repeat-btn" class="playlist-action-btn" title="Repeat off" aria-label="Repeat off">
+                <i class="fas fa-retweet"></i>
+                <span id="mobile-repeat-one-badge" class="repeat-one-badge hidden">1</span>
+              </button>
+              <button type="button" id="mobile-clear-queue-btn" class="playlist-action-btn" title="Clear queue" aria-label="Clear queue">
+                <i class="fas fa-trash-alt"></i>
+              </button>
+            </div>
+          </div>
           <div id="mobile-playlist-list" class="playlist-list"></div>
         </div>
       </div>
@@ -932,6 +1209,22 @@
     const mobilePlaylistView = document.getElementById('mobile-playlist-view');
     const mobilePlaylistClose = document.getElementById('mobile-playlist-close');
     const mobilePlaylistList = document.getElementById('mobile-playlist-list');
+    const queueCount = document.getElementById('queue-count');
+    const mobileQueueCount = document.getElementById('mobile-queue-count');
+    const historyCount = document.getElementById('history-count');
+    const mobileHistoryCount = document.getElementById('mobile-history-count');
+    const queueTabBtn = document.getElementById('queue-tab-btn');
+    const mobileQueueTabBtn = document.getElementById('mobile-queue-tab-btn');
+    const historyTabBtn = document.getElementById('history-tab-btn');
+    const mobileHistoryTabBtn = document.getElementById('mobile-history-tab-btn');
+    const shuffleBtn = document.getElementById('shuffle-btn');
+    const mobileShuffleBtn = document.getElementById('mobile-shuffle-btn');
+    const repeatBtn = document.getElementById('repeat-btn');
+    const mobileRepeatBtn = document.getElementById('mobile-repeat-btn');
+    const repeatOneBadge = document.getElementById('repeat-one-badge');
+    const mobileRepeatOneBadge = document.getElementById('mobile-repeat-one-badge');
+    const clearQueueBtn = document.getElementById('clear-queue-btn');
+    const mobileClearQueueBtn = document.getElementById('mobile-clear-queue-btn');
 
     let isPlaying = false;
     let currentSong = null;
@@ -945,6 +1238,22 @@
     let selectedIndex = -1;
     let isVolumeDragging = false;
     let isMobilePlaylistOpen = false;
+
+    // --- Dynamic queue / radio state ---
+    const MAX_HISTORY = 50;
+    const TARGET_QUEUE_SIZE = 30; // the queue keeps auto-refilling up to this many tracks
+    const QUEUE_LOW_WATERMARK = 10; // start refilling once the queue drops below this
+    let shuffleEnabled = false;
+    let preShuffleOrder = null; // videoIds in their pre-shuffle order, so we can restore it
+    let repeatMode = 'off'; // 'off' | 'all' | 'one'
+    let isExtendingQueue = false;
+    let playlistViewMode = 'queue'; // 'queue' | 'history' - which list the sidebar/mobile sheet is showing
+
+    // --- Prefetching: warm the stream-url cache for the next few tracks so
+    // playback starts instantly once the user actually reaches them. ---
+    const PREFETCH_COUNT = 4;
+    const PREFETCHED_IDS_CAP = 300; // keep the "already asked for" set from growing unbounded
+    let prefetchedIds = new Set();
 
     // Song/artist titles come from an external API and could contain HTML
     // special characters; always escape before inserting into innerHTML.
@@ -1062,7 +1371,7 @@
     });
 
     audioPlayer.addEventListener('ended', () => {
-      playNext();
+      playNext(true);
     });
 
     // Registered once (not per-song) to avoid stacking duplicate listeners
@@ -1269,32 +1578,94 @@
                            'fas fa-volume-up';
     }
 
-    function playNext() {
-      if (currentPlaylist.length > 0) {
-        const nextTrack = currentPlaylist[0];
-        if (currentSong) {
-          songHistory.push(currentSong);
-        }
-        socket.emit('play_song', { video_id: nextTrack.videoId });
-      } else {
-        resetMusicPlayer();
+    function pushHistory(song) {
+      if (!song) return;
+      songHistory.push(song);
+      if (songHistory.length > MAX_HISTORY) {
+        songHistory.shift();
       }
     }
 
-    function playPrevious() {
-      if (songHistory.length > 0) {
-        const prevTrack = songHistory.pop();
-        if (currentSong) {
-          currentPlaylist.unshift({
-            videoId: currentSong.videoId || '',
-            title: currentSong.song_title,
-            artist: currentSong.artist,
-            thumbnailUrl: currentSong.thumbnail_url
-          });
-        }
-        displayPlaylist(currentPlaylist);
-        socket.emit('play_song', { video_id: prevTrack.videoId || prevTrack.song_title });
+    function songToTrackShape(song) {
+      return {
+        videoId: song.videoId || song.video_id || '',
+        title: song.song_title || song.title || 'Unknown Title',
+        artist: song.artist || 'Unknown Artist',
+        thumbnailUrl: song.thumbnail_url || song.thumbnailUrl || null,
+      };
+    }
+
+    // Removes the track at `index` from the queue *before* asking the
+    // server to play it, so local state stays correct even if the reply is
+    // slow, empty, or never arrives - previously the queue only updated
+    // after `song_played` came back, which could leave a track stuck at
+    // the front of the queue (or replay forever) if that response was empty.
+    function playTrackFromQueue(index) {
+      if (index < 0 || index >= currentPlaylist.length) return;
+      const [track] = currentPlaylist.splice(index, 1);
+      if (preShuffleOrder) {
+        preShuffleOrder = preShuffleOrder.filter(id => id !== track.videoId);
       }
+      if (currentSong) {
+        pushHistory(currentSong);
+      }
+      refreshPlaylistPanel();
+      // radio:false - we already have a queue; continuation is handled by
+      // maybeExtendQueue() rather than asking the server to build a fresh
+      // radio on every single track change.
+      socket.emit('play_song', { video_id: track.videoId, radio: false });
+    }
+
+    function playNext(auto) {
+      // Repeat-one only kicks in on automatic (track-ended) advances, not
+      // when the user explicitly presses "next" - matches YouTube Music.
+      if (auto && repeatMode === 'one' && currentSong) {
+        audioPlayer.currentTime = 0;
+        audioPlayer.play().then(() => {
+          isPlaying = true;
+          updatePlayPauseButton();
+        }).catch(error => console.error('Repeat-one playback failed:', error));
+        return;
+      }
+
+      if (currentPlaylist.length > 0) {
+        playTrackFromQueue(0);
+        maybeExtendQueue();
+        return;
+      }
+
+      if (repeatMode === 'all' && (songHistory.length > 0 || currentSong)) {
+        const replayFrom = songHistory.length > 0 ? songHistory : [currentSong];
+        currentPlaylist = replayFrom.map(songToTrackShape).filter(t => t.videoId);
+        songHistory = [];
+        preShuffleOrder = null;
+        if (currentPlaylist.length > 0) {
+          playTrackFromQueue(0);
+          return;
+        }
+      }
+
+      resetMusicPlayer();
+    }
+
+    function playPrevious() {
+      if (songHistory.length === 0) return;
+      const prevSong = songHistory.pop();
+      if (currentSong) {
+        const track = songToTrackShape(currentSong);
+        if (track.videoId) {
+          currentPlaylist.unshift(track);
+          if (preShuffleOrder) preShuffleOrder.unshift(track.videoId);
+        }
+      }
+      refreshPlaylistPanel();
+      const prevVideoId = prevSong.videoId || prevSong.video_id;
+      if (!prevVideoId) {
+        console.warn('Skipping history entry with no video id:', prevSong);
+        playPrevious();
+        return;
+      }
+      socket.emit('play_song', { video_id: prevVideoId, radio: false });
     }
 
     function getLowResThumbnail(thumbnailUrl) {
@@ -1302,50 +1673,338 @@
       return thumbnailUrl.replace(/=w\d+-h\d+/, '=w120-h120').replace(/maxresdefault\.jpg/, 'default.jpg');
     }
 
-    function displayPlaylist(playlist) {
-      playlistList.innerHTML = '';
-      mobilePlaylistList.innerHTML = '';
-      if (!playlist || playlist.length === 0) {
-        playlistList.innerHTML = '<div class="text-center text-gray-400 py-8">No upcoming songs</div>';
-        mobilePlaylistList.innerHTML = '<div class="text-center text-gray-400 py-8">No upcoming songs</div>';
+    // --- Dynamic queue ("radio") extension ---
+    function collectKnownVideoIds() {
+      const ids = new Set();
+      currentPlaylist.forEach(t => t.videoId && ids.add(t.videoId));
+      songHistory.forEach(s => {
+        const id = s.videoId || s.video_id;
+        if (id) ids.add(id);
+      });
+      if (currentSong) {
+        const id = currentSong.videoId || currentSong.video_id;
+        if (id) ids.add(id);
+      }
+      return Array.from(ids);
+    }
+
+    function maybeExtendQueue() {
+      if (isExtendingQueue) return;
+      if (repeatMode === 'one') return;
+      if (currentPlaylist.length >= TARGET_QUEUE_SIZE) return;
+      if (currentPlaylist.length > QUEUE_LOW_WATERMARK) return;
+      const seed = currentPlaylist.length > 0
+        ? currentPlaylist[currentPlaylist.length - 1].videoId
+        : (currentSong ? (currentSong.videoId || currentSong.video_id) : null);
+      if (!seed) return;
+      isExtendingQueue = true;
+      const needed = TARGET_QUEUE_SIZE - currentPlaylist.length;
+      socket.emit('extend_queue', { video_id: seed, exclude: collectKnownVideoIds(), limit: needed });
+    }
+
+    function shuffleArray(arr) {
+      for (let i = arr.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [arr[i], arr[j]] = [arr[j], arr[i]];
+      }
+      return arr;
+    }
+
+    function toggleShuffle() {
+      shuffleEnabled = !shuffleEnabled;
+      if (shuffleEnabled) {
+        preShuffleOrder = currentPlaylist.map(t => t.videoId);
+        shuffleArray(currentPlaylist);
+      } else if (preShuffleOrder) {
+        const byId = new Map(currentPlaylist.map(t => [t.videoId, t]));
+        const restored = preShuffleOrder.map(id => byId.get(id)).filter(Boolean);
+        const restoredIds = new Set(restored.map(t => t.videoId));
+        const extra = currentPlaylist.filter(t => !restoredIds.has(t.videoId));
+        currentPlaylist = restored.concat(extra);
+        preShuffleOrder = null;
+      }
+      updateShuffleButtons();
+      refreshPlaylistPanel();
+    }
+
+    function cycleRepeatMode() {
+      repeatMode = repeatMode === 'off' ? 'all' : repeatMode === 'all' ? 'one' : 'off';
+      updateRepeatButtons();
+    }
+
+    function updateShuffleButtons() {
+      [shuffleBtn, mobileShuffleBtn].forEach(btn => {
+        if (!btn) return;
+        btn.classList.toggle('active', shuffleEnabled);
+        btn.setAttribute('aria-pressed', String(shuffleEnabled));
+        btn.title = shuffleEnabled ? 'Shuffle on' : 'Shuffle off';
+      });
+    }
+
+    function updateRepeatButtons() {
+      const label = repeatMode === 'off' ? 'Repeat off' : repeatMode === 'all' ? 'Repeat all' : 'Repeat one';
+      [repeatBtn, mobileRepeatBtn].forEach(btn => {
+        if (!btn) return;
+        btn.classList.toggle('active', repeatMode !== 'off');
+        btn.title = label;
+        btn.setAttribute('aria-label', label);
+      });
+      [repeatOneBadge, mobileRepeatOneBadge].forEach(badge => {
+        if (!badge) return;
+        badge.classList.toggle('hidden', repeatMode !== 'one');
+      });
+    }
+
+    function clearQueue() {
+      currentPlaylist = [];
+      preShuffleOrder = shuffleEnabled ? [] : null;
+      refreshPlaylistPanel();
+    }
+
+    function clearHistory() {
+      songHistory = [];
+      refreshPlaylistPanel();
+    }
+
+    function handleClearButtonClick() {
+      if (playlistViewMode === 'history') {
+        clearHistory();
+      } else {
+        clearQueue();
+      }
+    }
+
+    function updateClearButtonLabels() {
+      const label = playlistViewMode === 'history' ? 'Clear history' : 'Clear queue';
+      [clearQueueBtn, mobileClearQueueBtn].forEach(btn => {
+        if (!btn) return;
+        btn.title = label;
+        btn.setAttribute('aria-label', label);
+      });
+    }
+
+    function removeFromQueue(index) {
+      if (index < 0 || index >= currentPlaylist.length) return;
+      const [removed] = currentPlaylist.splice(index, 1);
+      if (preShuffleOrder && removed) {
+        preShuffleOrder = preShuffleOrder.filter(id => id !== removed.videoId);
+      }
+      refreshPlaylistPanel();
+    }
+
+    // Rewinds playback to an earlier song in history. Everything that was
+    // played *after* that song (plus the current track) gets pushed back
+    // onto the front of the queue, in order, so pressing "next" continues
+    // exactly where it would have before you jumped back.
+    function playFromHistory(historyIndex) {
+      if (historyIndex < 0 || historyIndex >= songHistory.length) return;
+      const target = songHistory[historyIndex];
+      const targetVideoId = target.videoId || target.video_id;
+      if (!targetVideoId) {
+        console.warn('Skipping history entry with no video id:', target);
         return;
       }
-      playlist.forEach((track, index) => {
-        const lowResThumbnail = getLowResThumbnail(track.thumbnailUrl);
-        const div = document.createElement('div');
-        div.className = 'playlist-item';
-        div.innerHTML = `
-          <img src="${escapeHtml(lowResThumbnail)}" alt="${escapeHtml(track.title)}" class="playlist-item-thumbnail" onerror="this.style.display='none';" />
-          <div class="playlist-item-info">
-            <div class="playlist-item-title">${escapeHtml(track.title)}</div>
-            <div class="playlist-item-artist">${escapeHtml(track.artist)}</div>
-          </div>
-        `;
-        div.addEventListener('click', () => {
-          if (currentSong) {
-            songHistory.push(currentSong);
-          }
-          currentPlaylist.splice(index, 1);
-          displayPlaylist(currentPlaylist);
-          socket.emit('play_song', { video_id: track.videoId });
-        });
-        playlistList.appendChild(div);
-        const mobileDiv = document.createElement('div');
-        mobileDiv.className = 'playlist-item';
-        mobileDiv.innerHTML = div.innerHTML;
-        mobileDiv.addEventListener('click', () => {
-          if (currentSong) {
-            songHistory.push(currentSong);
-          }
-          currentPlaylist.splice(index, 1);
-          displayPlaylist(currentPlaylist);
-          socket.emit('play_song', { video_id: track.videoId });
+      const playedAfter = songHistory.slice(historyIndex + 1);
+      if (currentSong) playedAfter.push(currentSong);
+
+      const requeueTracks = playedAfter.map(songToTrackShape).filter(t => t.videoId);
+      currentPlaylist = requeueTracks.concat(currentPlaylist);
+      if (preShuffleOrder) {
+        preShuffleOrder = requeueTracks.map(t => t.videoId).concat(preShuffleOrder);
+      }
+      songHistory = songHistory.slice(0, historyIndex);
+
+      refreshPlaylistPanel();
+      socket.emit('play_song', { video_id: targetVideoId, radio: false });
+    }
+
+    // Shared "album art or fallback icon" thumbnail, used by both the
+    // up-next queue and the history list so a missing/broken image never
+    // leaves a blank gap.
+    function createTrackMediaElement(thumbnailUrl, altText) {
+      const media = document.createElement('div');
+      media.className = 'playlist-item-media';
+      const lowRes = getLowResThumbnail(thumbnailUrl);
+      if (lowRes) {
+        const img = document.createElement('img');
+        img.className = 'playlist-item-thumbnail';
+        img.alt = altText || '';
+        img.loading = 'lazy';
+        img.src = lowRes;
+        img.addEventListener('error', () => {
+          media.innerHTML = '<i class="fas fa-music playlist-item-icon"></i>';
+        }, { once: true });
+        media.appendChild(img);
+      } else {
+        media.innerHTML = '<i class="fas fa-music playlist-item-icon"></i>';
+      }
+      return media;
+    }
+
+    function createPlaylistItemElement(track, index, closeMobileOnPlay) {
+      const div = document.createElement('div');
+      div.className = 'playlist-item';
+
+      const media = createTrackMediaElement(track.thumbnailUrl, track.title);
+
+      const info = document.createElement('div');
+      info.className = 'playlist-item-info';
+      info.innerHTML = `
+        <div class="playlist-item-title">${escapeHtml(track.title)}</div>
+        <div class="playlist-item-artist">${escapeHtml(track.artist)}</div>
+      `;
+
+      const removeBtn = document.createElement('button');
+      removeBtn.type = 'button';
+      removeBtn.className = 'playlist-item-remove';
+      removeBtn.title = 'Remove from queue';
+      removeBtn.setAttribute('aria-label', `Remove ${track.title} from queue`);
+      removeBtn.innerHTML = '<i class="fas fa-times"></i>';
+      removeBtn.addEventListener('click', (event) => {
+        event.stopPropagation();
+        removeFromQueue(index);
+      });
+
+      div.appendChild(media);
+      div.appendChild(info);
+      div.appendChild(removeBtn);
+
+      div.addEventListener('click', () => {
+        playTrackFromQueue(index);
+        if (closeMobileOnPlay) {
           mobilePlaylistView.classList.remove('visible');
           isMobilePlaylistOpen = false;
-        });
-        mobilePlaylistList.appendChild(mobileDiv);
+        }
       });
+
+      return div;
+    }
+
+    function createHistoryItemElement(song, historyIndex, closeMobileOnPlay) {
+      const track = songToTrackShape(song);
+      const div = document.createElement('div');
+      div.className = 'playlist-item history-item';
+
+      const media = createTrackMediaElement(track.thumbnailUrl, track.title);
+
+      const info = document.createElement('div');
+      info.className = 'playlist-item-info';
+      info.innerHTML = `
+        <div class="playlist-item-title">${escapeHtml(track.title)}</div>
+        <div class="playlist-item-artist">${escapeHtml(track.artist)}</div>
+      `;
+
+      const playAgainBtn = document.createElement('button');
+      playAgainBtn.type = 'button';
+      playAgainBtn.className = 'playlist-item-remove';
+      playAgainBtn.title = 'Play again';
+      playAgainBtn.setAttribute('aria-label', `Play ${track.title} again`);
+      playAgainBtn.innerHTML = '<i class="fas fa-history"></i>';
+      playAgainBtn.addEventListener('click', (event) => {
+        event.stopPropagation();
+        playFromHistory(historyIndex);
+        if (closeMobileOnPlay) {
+          mobilePlaylistView.classList.remove('visible');
+          isMobilePlaylistOpen = false;
+        }
+      });
+
+      div.appendChild(media);
+      div.appendChild(info);
+      div.appendChild(playAgainBtn);
+
+      div.addEventListener('click', () => {
+        playFromHistory(historyIndex);
+        if (closeMobileOnPlay) {
+          mobilePlaylistView.classList.remove('visible');
+          isMobilePlaylistOpen = false;
+        }
+      });
+
+      return div;
+    }
+
+    function renderQueueList() {
+      if (!currentPlaylist || currentPlaylist.length === 0) {
+        const emptyMsg = '<div class="playlist-empty">No upcoming songs — search to start a radio, or add tracks to the queue.</div>';
+        playlistList.innerHTML = emptyMsg;
+        mobilePlaylistList.innerHTML = emptyMsg;
+        return;
+      }
+      playlistList.innerHTML = '';
+      mobilePlaylistList.innerHTML = '';
+      currentPlaylist.forEach((track, index) => {
+        playlistList.appendChild(createPlaylistItemElement(track, index, false));
+        mobilePlaylistList.appendChild(createPlaylistItemElement(track, index, true));
+      });
+    }
+
+    function renderHistoryList() {
+      if (!songHistory || songHistory.length === 0) {
+        const emptyMsg = '<div class="playlist-empty">Songs you\'ve played will show up here.</div>';
+        playlistList.innerHTML = emptyMsg;
+        mobilePlaylistList.innerHTML = emptyMsg;
+        return;
+      }
+      playlistList.innerHTML = '';
+      mobilePlaylistList.innerHTML = '';
+      // Most recently played first.
+      for (let i = songHistory.length - 1; i >= 0; i--) {
+        playlistList.appendChild(createHistoryItemElement(songHistory[i], i, false));
+        mobilePlaylistList.appendChild(createHistoryItemElement(songHistory[i], i, true));
+      }
+    }
+
+    function setPlaylistViewMode(mode) {
+      playlistViewMode = mode;
+      const isHistory = mode === 'history';
+      [queueTabBtn, mobileQueueTabBtn].forEach(btn => {
+        if (!btn) return;
+        btn.classList.toggle('active', !isHistory);
+        btn.setAttribute('aria-selected', String(!isHistory));
+      });
+      [historyTabBtn, mobileHistoryTabBtn].forEach(btn => {
+        if (!btn) return;
+        btn.classList.toggle('active', isHistory);
+        btn.setAttribute('aria-selected', String(isHistory));
+      });
+      updateClearButtonLabels();
+      refreshPlaylistPanel();
+    }
+
+    // Single entry point for "the queue or history changed" - keeps both
+    // tab counters accurate (even for the tab that isn't currently shown),
+    // re-renders whichever list is active, and kicks off queue refill /
+    // prefetching as needed.
+    function refreshPlaylistPanel() {
+      if (queueCount) queueCount.textContent = String(currentPlaylist.length);
+      if (mobileQueueCount) mobileQueueCount.textContent = String(currentPlaylist.length);
+      if (historyCount) historyCount.textContent = String(songHistory.length);
+      if (mobileHistoryCount) mobileHistoryCount.textContent = String(songHistory.length);
+
+      if (playlistViewMode === 'history') {
+        renderHistoryList();
+      } else {
+        renderQueueList();
+      }
+
       updateMobileUpNext();
+      schedulePrefetch();
+    }
+
+    // Ask the server to warm the stream-url cache for the next few tracks
+    // in the queue, so pressing "next" (or auto-advance) is instant instead
+    // of waiting on a fresh yt-dlp extraction.
+    function schedulePrefetch() {
+      const upcoming = currentPlaylist.slice(0, PREFETCH_COUNT).map(t => t.videoId).filter(Boolean);
+      const toFetch = upcoming.filter(id => !prefetchedIds.has(id));
+      if (toFetch.length === 0) return;
+      toFetch.forEach(id => prefetchedIds.add(id));
+      if (prefetchedIds.size > PREFETCHED_IDS_CAP) {
+        // Cheap unbounded-growth guard: once too big, just start a fresh set.
+        prefetchedIds = new Set(toFetch);
+      }
+      socket.emit('prefetch_tracks', { video_ids: toFetch });
     }
 
     const connectionToast = document.getElementById('connection-toast');
@@ -1397,16 +2056,42 @@
       songLoading.classList.add('hidden');
       playSong(song);
 
-      if (song.playlist && song.playlist.length > 0) {
-        if (currentPlaylist.length > 0) {
-          currentPlaylist.shift();
-        }
-        const existingIds = new Set(currentPlaylist.map(t => t.videoId));
-        const newTracks = song.playlist.filter(t => !existingIds.has(t.videoId));
+      // The queue itself was already updated (item removed) before this
+      // request was sent - see playTrackFromQueue/playPrevious. Here we
+      // only ever *add* whatever fresh radio tracks the server included.
+      if (Array.isArray(song.playlist) && song.playlist.length > 0) {
+        const knownIds = new Set(currentPlaylist.map(t => t.videoId));
+        const currentId = song.videoId;
+        if (currentId) knownIds.add(currentId);
+        const newTracks = song.playlist.filter(t => t.videoId && !knownIds.has(t.videoId));
+        if (shuffleEnabled && newTracks.length > 1) shuffleArray(newTracks);
         currentPlaylist.push(...newTracks);
+        if (preShuffleOrder) preShuffleOrder.push(...newTracks.map(t => t.videoId));
       }
 
-      displayPlaylist(currentPlaylist);
+      refreshPlaylistPanel();
+      maybeExtendQueue();
+    });
+
+    socket.on('queue_extended', (data) => {
+      isExtendingQueue = false;
+      if (!data || !Array.isArray(data.tracks) || data.tracks.length === 0) return;
+      const knownIds = new Set(collectKnownVideoIds());
+      const newTracks = data.tracks.filter(t => t.videoId && !knownIds.has(t.videoId));
+      if (newTracks.length === 0) return;
+      if (shuffleEnabled) shuffleArray(newTracks);
+      currentPlaylist.push(...newTracks);
+      if (preShuffleOrder) preShuffleOrder.push(...newTracks.map(t => t.videoId));
+      refreshPlaylistPanel();
+      // Still short of the target? Ask for another batch, seeded from the
+      // newest track, so a single low-watermark trigger can refill the
+      // whole queue rather than only adding one small batch.
+      maybeExtendQueue();
+    });
+
+    socket.on('queue_extend_error', (error) => {
+      isExtendingQueue = false;
+      console.warn('Could not extend queue:', error && error.error);
     });
 
     socket.on('song_error', (error) => {
@@ -1501,25 +2186,79 @@
         const artist = song.artist || 'Unknown Artist';
         const li = document.createElement('li');
         li.className = 'suggestion-item';
-        li.innerHTML = `
-          <i class="fas fa-music suggestion-icon"></i>
-          <div class="suggestion-text">
-            <div class="suggestion-title">${escapeHtml(title)}</div>
-            <div class="suggestion-artist">${escapeHtml(artist)}</div>
-          </div>
+
+        const media = document.createElement('div');
+        media.className = 'suggestion-media';
+        const lowResThumb = getLowResThumbnail(song.thumbnailUrl);
+        if (lowResThumb) {
+          const img = document.createElement('img');
+          img.className = 'suggestion-thumbnail';
+          img.alt = '';
+          img.loading = 'lazy';
+          img.src = lowResThumb;
+          img.addEventListener('error', () => {
+            media.innerHTML = '<i class="fas fa-music suggestion-icon"></i>';
+          }, { once: true });
+          media.appendChild(img);
+        } else {
+          media.innerHTML = '<i class="fas fa-music suggestion-icon"></i>';
+        }
+
+        const text = document.createElement('div');
+        text.className = 'suggestion-text';
+        text.innerHTML = `
+          <div class="suggestion-title">${escapeHtml(title)}</div>
+          <div class="suggestion-artist">${escapeHtml(artist)}</div>
         `;
+
+        const addBtn = document.createElement('button');
+        addBtn.type = 'button';
+        addBtn.className = 'suggestion-add-queue';
+        addBtn.title = 'Add to queue';
+        addBtn.setAttribute('aria-label', `Add ${title} to queue`);
+        addBtn.innerHTML = '<i class="fas fa-plus"></i>';
+        addBtn.addEventListener('click', (event) => {
+          event.stopPropagation();
+          addToQueue(song);
+          addBtn.innerHTML = '<i class="fas fa-check"></i>';
+          addBtn.classList.add('added');
+          setTimeout(() => {
+            addBtn.innerHTML = '<i class="fas fa-plus"></i>';
+            addBtn.classList.remove('added');
+          }, 900);
+        });
+
+        li.appendChild(media);
+        li.appendChild(text);
+        li.appendChild(addBtn);
+
         li.addEventListener('click', () => {
           searchSongInput.value = `${title} - ${artist}`;
           clearSearchBtn.classList.add('visible');
           searchSuggestions.classList.add('hidden');
           currentPlaylist = [];
           songHistory = [];
+          preShuffleOrder = null;
           socket.emit('play_song', { video_id: song.videoId });
         });
         searchSuggestions.appendChild(li);
       });
       searchSuggestions.classList.remove('hidden');
       selectedIndex = -1;
+    }
+
+    function addToQueue(song) {
+      const videoId = song.videoId || song.video_id;
+      if (!videoId) return;
+      if (currentPlaylist.some(t => t.videoId === videoId)) return;
+      currentPlaylist.push({
+        videoId,
+        title: song.title || song.song_title || 'Unknown Title',
+        artist: song.artist || 'Unknown Artist',
+        thumbnailUrl: song.thumbnailUrl || song.thumbnail_url || null,
+      });
+      if (preShuffleOrder) preShuffleOrder.push(videoId);
+      refreshPlaylistPanel();
     }
 
     document.addEventListener('click', (event) => {
@@ -1529,9 +2268,20 @@
     });
 
     playPauseBtn.addEventListener('click', togglePlayPause);
-    nextBtn.addEventListener('click', playNext);
+    nextBtn.addEventListener('click', () => playNext(false));
     prevBtn.addEventListener('click', playPrevious);
     volumeBtn.addEventListener('click', toggleMute);
+
+    [shuffleBtn, mobileShuffleBtn].forEach(btn => btn && btn.addEventListener('click', toggleShuffle));
+    [repeatBtn, mobileRepeatBtn].forEach(btn => btn && btn.addEventListener('click', cycleRepeatMode));
+    [clearQueueBtn, mobileClearQueueBtn].forEach(btn => btn && btn.addEventListener('click', handleClearButtonClick));
+    [queueTabBtn, mobileQueueTabBtn].forEach(btn => btn && btn.addEventListener('click', () => setPlaylistViewMode('queue')));
+    [historyTabBtn, mobileHistoryTabBtn].forEach(btn => btn && btn.addEventListener('click', () => setPlaylistViewMode('history')));
+
+    updateShuffleButtons();
+    updateRepeatButtons();
+    updateClearButtonLabels();
+    refreshPlaylistPanel();
 
     mobileUpNextBar.addEventListener('click', () => {
       isMobilePlaylistOpen = true;
