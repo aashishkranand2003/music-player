@@ -48,8 +48,12 @@ socketio = SocketIO(
 
 REQUEST_TIMEOUT = 15  # seconds
 CACHE_TIMEOUT = 500  # seconds
-CACHE_MAX_ENTRIES = 500
+CACHE_MAX_ENTRIES = 50
 CACHE_CLEAN_INTERVAL = 300  # seconds
+INITIAL_QUEUE_SIZE = 30  # up-next tracks fetched when a fresh radio starts
+EXTEND_BATCH_SIZE = 10  # up-next tracks fetched per queue-extend call
+MAX_RADIO_BATCH = 30  # hard cap on any single radio/extend request, client-requested or not
+MAX_PREFETCH_PER_REQUEST = 4  # how many tracks a client can ask to prefetch at once
 
 stream_url_cache = {}
 _cache_lock = threading.Lock()
@@ -258,26 +262,14 @@ def play_song(data):
         emit("song_error", {"error": "Failed to get audio stream URL"}, room=request.sid)
         return
 
-    playlist_tracks = []
-    try:
-        watch_playlist = ytmusic.get_watch_playlist(videoId=video_id, limit=11)
-        for track in (watch_playlist.get("tracks") or [])[1:]:
-            t_video_id = track.get("videoId")
-            if not t_video_id:
-                continue
-            p_artists = track.get("artists") or []
-            p_thumbnails = track.get("thumbnails") or []
-            playlist_tracks.append(
-                {
-                    "title": track.get("title") or "Unknown Title",
-                    "artist": p_artists[0]["name"] if p_artists and p_artists[0].get("name") else "Unknown Artist",
-                    "videoId": t_video_id,
-                    "thumbnailUrl": p_thumbnails[-1]["url"] if p_thumbnails else None,
-                }
-            )
-    except Exception:
-        logger.exception("Error getting watch playlist for video_id=%r", video_id)
-        playlist_tracks = []
+    # `radio` lets the client opt out of building an autoplay queue (e.g. when
+    # it's just resuming a track that's already in its local queue/history).
+    want_radio = data.get("radio", True) is not False
+    playlist_tracks = (
+        _get_radio_tracks(video_id, exclude_ids={video_id}, limit=INITIAL_QUEUE_SIZE)
+        if want_radio
+        else []
+    )
 
     song_data = {
         "stream_url": stream_url,
@@ -288,6 +280,124 @@ def play_song(data):
         "playlist": playlist_tracks,
     }
     emit("song_played", song_data, room=request.sid)
+
+
+@socketio.on("extend_queue")
+def extend_queue(data):
+    """Fetch more auto-play ("radio") tracks that continue on from a seed
+    track, so the client's up-next queue can keep growing dynamically
+    instead of ever running dry - mirrors YouTube Music's endless radio."""
+    if not isinstance(data, dict):
+        emit("queue_extend_error", {"error": "Invalid request"}, room=request.sid)
+        return
+
+    video_id = (data.get("video_id") or "").strip() or None
+    if not video_id:
+        emit("queue_extend_error", {"error": "No seed track specified"}, room=request.sid)
+        return
+
+    raw_exclude = data.get("exclude") or []
+    if not isinstance(raw_exclude, list):
+        raw_exclude = []
+    exclude_ids = {video_id} | {str(x).strip() for x in raw_exclude if str(x).strip()}
+
+    try:
+        requested_limit = int(data.get("limit", EXTEND_BATCH_SIZE))
+    except (TypeError, ValueError):
+        requested_limit = EXTEND_BATCH_SIZE
+    limit = max(1, min(requested_limit, MAX_RADIO_BATCH))
+
+    tracks = _get_radio_tracks(video_id, exclude_ids=exclude_ids, limit=limit)
+    if not tracks:
+        emit("queue_extend_error", {"error": "Couldn't find more tracks for this radio"}, room=request.sid)
+        return
+
+    emit("queue_extended", {"seed_video_id": video_id, "tracks": tracks}, room=request.sid)
+
+
+@socketio.on("prefetch_tracks")
+def prefetch_tracks(data):
+    """Warm the stream-url cache for a handful of upcoming queue tracks in
+    the background, so playback is instant once the user actually reaches
+    them. Fire-and-forget: no reply is sent, and failures are only logged -
+    a failed prefetch just means that track resolves normally when played."""
+    if not isinstance(data, dict):
+        return
+
+    raw_ids = data.get("video_ids") or []
+    if not isinstance(raw_ids, list):
+        return
+
+    video_ids = []
+    seen = set()
+    for raw_id in raw_ids:
+        video_id = str(raw_id).strip()
+        if video_id and video_id not in seen:
+            seen.add(video_id)
+            video_ids.append(video_id)
+        if len(video_ids) >= MAX_PREFETCH_PER_REQUEST:
+            break
+
+    for video_id in video_ids:
+        socketio.start_background_task(_prefetch_stream_url, video_id)
+
+
+def _prefetch_stream_url(video_id):
+    """Resolve and cache a track's stream URL ahead of time. Runs in its own
+    greenlet so a slow/failed extraction never blocks anything else."""
+    try:
+        video_url = f"https://music.youtube.com/watch?v={video_id}"
+        with _cache_lock:
+            cached = stream_url_cache.get(video_url)
+        if cached and time.time() - cached[1] < CACHE_TIMEOUT:
+            return  # already warm
+        get_audio_stream_url(video_url)
+    except Exception:
+        logger.exception("Prefetch failed for video_id=%r", video_id)
+
+
+def _format_playlist_track(track):
+    """Normalize a ytmusicapi track dict into the shape the frontend expects.
+    Returns None if the track is missing required fields."""
+    t_video_id = track.get("videoId")
+    if not t_video_id:
+        return None
+    p_artists = track.get("artists") or []
+    p_thumbnails = track.get("thumbnails") or []
+    return {
+        "title": track.get("title") or "Unknown Title",
+        "artist": p_artists[0]["name"] if p_artists and p_artists[0].get("name") else "Unknown Artist",
+        "videoId": t_video_id,
+        "thumbnailUrl": p_thumbnails[-1]["url"] if p_thumbnails else None,
+    }
+
+
+def _get_radio_tracks(video_id, exclude_ids=None, limit=EXTEND_BATCH_SIZE):
+    """Ask ytmusicapi for a watch-playlist ("radio") seeded on video_id and
+    return a deduplicated, cleaned list of up-next tracks. Never raises -
+    on any failure it logs and returns an empty list so callers can degrade
+    gracefully instead of breaking playback."""
+    limit = max(1, min(int(limit or EXTEND_BATCH_SIZE), MAX_RADIO_BATCH))
+    seen = set(exclude_ids or ())
+    tracks = []
+    try:
+        watch_playlist = ytmusic.get_watch_playlist(videoId=video_id, limit=limit + len(seen) + 1)
+        for track in (watch_playlist.get("tracks") or []):
+            try:
+                formatted = _format_playlist_track(track)
+            except Exception:
+                logger.exception("Skipping malformed watch-playlist track: %r", track)
+                continue
+            if not formatted or formatted["videoId"] in seen:
+                continue
+            seen.add(formatted["videoId"])
+            tracks.append(formatted)
+            if len(tracks) >= limit:
+                break
+    except Exception:
+        logger.exception("Error getting watch playlist for video_id=%r", video_id)
+        return []
+    return tracks
 
 
 def search_youtube_music(query):
@@ -322,7 +432,7 @@ def get_audio_stream_url(youtube_url):
                 return url
 
         ydl_opts = {
-            "format": "251/140/best",
+            "format": "best",
             "quiet": True,
             "noplaylist": False,
             "http_chunk_size": 8192,
