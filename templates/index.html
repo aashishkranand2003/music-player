@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Music Player UI</title>
+  <title>Music Player</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css" />
   <script src="https://cdnjs.cloudflare.com/ajax/libs/node-vibrant/3.1.6/vibrant.min.js"></script>
@@ -264,7 +264,7 @@
       padding: 24px;
       margin-top: 80px;
       display: flex;
-      overflow: auto;
+      overflow: hidden;
     }
 
     .player-layout {
@@ -597,37 +597,25 @@
       flex-wrap: wrap;
     }
 
-    .playlist-tabs {
-      display: flex;
-      gap: 4px;
-      background: rgba(255, 255, 255, 0.08);
-      border-radius: 999px;
-      padding: 3px;
+    .playlist-now-playing {
+      background: rgba(255, 255, 255, 0.22);
+      cursor: default;
     }
 
-    .playlist-tab {
-      border: none;
-      background: transparent;
-      color: rgba(255, 255, 255, 0.7);
-      font-size: 13px;
-      font-weight: 600;
-      padding: 6px 12px;
-      border-radius: 999px;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      transition: background 0.2s ease, color 0.2s ease;
-      white-space: nowrap;
+    .playlist-now-playing:hover {
+      background: rgba(255, 255, 255, 0.22);
+      transform: none;
     }
 
-    .playlist-tab:hover {
+    .playlist-now-playing .playlist-item-title {
       color: #ffffff;
+      font-weight: 700;
     }
 
-    .playlist-tab.active {
-      background: rgba(255, 255, 255, 0.28);
-      color: #ffffff;
+    .playlist-now-playing .eq-indicator {
+      margin-right: 0;
+      flex-shrink: 0;
+      margin-left: 8px;
     }
 
     .playlist-title {
@@ -1107,14 +1095,7 @@
         <div class="playlist-section">
           <div class="playlist-card">
             <div class="playlist-header">
-              <div class="playlist-tabs" role="tablist" aria-label="Playlist view">
-                <button type="button" id="queue-tab-btn" class="playlist-tab active" role="tab" aria-selected="true">
-                  Up Next <span id="queue-count" class="queue-count">0</span>
-                </button>
-                <button type="button" id="history-tab-btn" class="playlist-tab" role="tab" aria-selected="false">
-                  History <span id="history-count" class="queue-count">0</span>
-                </button>
-              </div>
+              <h3 class="playlist-title">Queue <span id="queue-count" class="queue-count">0</span></h3>
               <div class="playlist-header-actions">
                 <button type="button" id="shuffle-btn" class="playlist-action-btn" title="Shuffle queue" aria-label="Shuffle queue" aria-pressed="false">
                   <i class="fas fa-random"></i>
@@ -1123,7 +1104,7 @@
                   <i class="fas fa-retweet"></i>
                   <span id="repeat-one-badge" class="repeat-one-badge hidden">1</span>
                 </button>
-                <button type="button" id="clear-queue-btn" class="playlist-action-btn" title="Clear queue" aria-label="Clear queue">
+                <button type="button" id="clear-queue-btn" class="playlist-action-btn" title="Clear upcoming" aria-label="Clear upcoming">
                   <i class="fas fa-trash-alt"></i>
                 </button>
               </div>
@@ -1146,14 +1127,7 @@
         <i class="fas fa-times mobile-playlist-close" id="mobile-playlist-close"></i>
         <div class="mobile-playlist-card">
           <div class="playlist-header">
-            <div class="playlist-tabs" role="tablist" aria-label="Playlist view">
-              <button type="button" id="mobile-queue-tab-btn" class="playlist-tab active" role="tab" aria-selected="true">
-                Up Next <span id="mobile-queue-count" class="queue-count">0</span>
-              </button>
-              <button type="button" id="mobile-history-tab-btn" class="playlist-tab" role="tab" aria-selected="false">
-                History <span id="mobile-history-count" class="queue-count">0</span>
-              </button>
-            </div>
+            <h3 class="playlist-title">Queue <span id="mobile-queue-count" class="queue-count">0</span></h3>
             <div class="playlist-header-actions">
               <button type="button" id="mobile-shuffle-btn" class="playlist-action-btn" title="Shuffle queue" aria-label="Shuffle queue" aria-pressed="false">
                 <i class="fas fa-random"></i>
@@ -1162,7 +1136,7 @@
                 <i class="fas fa-retweet"></i>
                 <span id="mobile-repeat-one-badge" class="repeat-one-badge hidden">1</span>
               </button>
-              <button type="button" id="mobile-clear-queue-btn" class="playlist-action-btn" title="Clear queue" aria-label="Clear queue">
+              <button type="button" id="mobile-clear-queue-btn" class="playlist-action-btn" title="Clear upcoming" aria-label="Clear upcoming">
                 <i class="fas fa-trash-alt"></i>
               </button>
             </div>
@@ -1211,12 +1185,6 @@
     const mobilePlaylistList = document.getElementById('mobile-playlist-list');
     const queueCount = document.getElementById('queue-count');
     const mobileQueueCount = document.getElementById('mobile-queue-count');
-    const historyCount = document.getElementById('history-count');
-    const mobileHistoryCount = document.getElementById('mobile-history-count');
-    const queueTabBtn = document.getElementById('queue-tab-btn');
-    const mobileQueueTabBtn = document.getElementById('mobile-queue-tab-btn');
-    const historyTabBtn = document.getElementById('history-tab-btn');
-    const mobileHistoryTabBtn = document.getElementById('mobile-history-tab-btn');
     const shuffleBtn = document.getElementById('shuffle-btn');
     const mobileShuffleBtn = document.getElementById('mobile-shuffle-btn');
     const repeatBtn = document.getElementById('repeat-btn');
@@ -1239,33 +1207,25 @@
     let isVolumeDragging = false;
     let isMobilePlaylistOpen = false;
 
-    // --- Dynamic queue / radio state ---
     const MAX_HISTORY = 50;
-    const TARGET_QUEUE_SIZE = 30; // the queue keeps auto-refilling up to this many tracks
-    const QUEUE_LOW_WATERMARK = 10; // start refilling once the queue drops below this
+    const TARGET_QUEUE_SIZE = 30;
+    const QUEUE_LOW_WATERMARK = 10;
     let shuffleEnabled = false;
-    let preShuffleOrder = null; // videoIds in their pre-shuffle order, so we can restore it
-    let repeatMode = 'off'; // 'off' | 'all' | 'one'
+    let preShuffleOrder = null;
+    let repeatMode = 'off';
     let isExtendingQueue = false;
-    let playlistViewMode = 'queue'; // 'queue' | 'history' - which list the sidebar/mobile sheet is showing
+    let pendingScrollToCurrent = false;
 
-    // --- Prefetching: warm the stream-url cache for the next few tracks so
-    // playback starts instantly once the user actually reaches them. ---
     const PREFETCH_COUNT = 4;
-    const PREFETCHED_IDS_CAP = 300; // keep the "already asked for" set from growing unbounded
+    const PREFETCHED_IDS_CAP = 300;
     let prefetchedIds = new Set();
 
-    // Song/artist titles come from an external API and could contain HTML
-    // special characters; always escape before inserting into innerHTML.
     function escapeHtml(value) {
       const div = document.createElement('div');
       div.textContent = value === undefined || value === null ? '' : String(value);
       return div.innerHTML;
     }
 
-    // Safe wrappers around the Notification API: some browsers/contexts
-    // (e.g. iOS Safari, insecure origins) don't expose `Notification` at
-    // all, so touching it directly can throw a ReferenceError.
     const hasNotificationSupport = typeof Notification !== 'undefined';
 
     function notifyPermissionGranted() {
@@ -1281,7 +1241,6 @@
       }
     }
 
-    // Request notification permission
     if (hasNotificationSupport && Notification.permission !== 'granted' && Notification.permission !== 'denied') {
       try {
         Notification.requestPermission();
@@ -1374,8 +1333,6 @@
       playNext(true);
     });
 
-    // Registered once (not per-song) to avoid stacking duplicate listeners
-    // every time a new track starts playing.
     audioPlayer.addEventListener('loadedmetadata', () => {
       durationTimeLabel.textContent = formatTime(audioPlayer.duration);
       if ('mediaSession' in navigator) {
@@ -1407,6 +1364,7 @@
       currentSong = song;
       shouldAutoplay = true;
       isPlaying = false;
+      pendingScrollToCurrent = true;
 
       updateSongInfo(song);
       updateMobileUpNext();
@@ -1438,14 +1396,11 @@
         }
       }, { once: true });
 
-      // Reset the visible time immediately; the persistent 'loadedmetadata'
-      // listener (registered once, above) will fill in the real duration.
       currentTimeLabel.textContent = '0:00';
       durationTimeLabel.textContent = '0:00';
       progressBar.style.width = '0%';
       seekButton.style.left = '0%';
 
-      // Update Media Session metadata
       if ('mediaSession' in navigator) {
         navigator.mediaSession.metadata = new MediaMetadata({
           title: song.song_title || 'Song Title',
@@ -1457,7 +1412,6 @@
         });
       }
 
-      // Fallback Web Notification
       if (!('mediaSession' in navigator)) {
         safeNotify(song.song_title || 'Song Title', {
           body: `Now Playing: ${song.artist || 'Artist Name'}`,
@@ -1527,7 +1481,6 @@
       }
       songTitle.textContent = song ? song.song_title : 'Song Title';
       artistName.textContent = song ? song.artist : 'Artist Name';
-      // Update Media Session metadata
       if ('mediaSession' in navigator) {
         navigator.mediaSession.metadata = new MediaMetadata({
           title: song ? song.song_title : 'Song Title',
@@ -1557,6 +1510,9 @@
     function updatePlayPauseButton() {
       playPauseBtn.className = isPlaying ? 'fas fa-pause play-pause-btn' : 'fas fa-play play-pause-btn';
       eqIndicator.classList.toggle('hidden', !isPlaying);
+      document.querySelectorAll('.playlist-now-playing .eq-indicator').forEach(el => {
+        el.classList.toggle('hidden', !isPlaying);
+      });
     }
 
     function toggleMute() {
@@ -1595,14 +1551,10 @@
       };
     }
 
-    // Removes the track at `index` from the queue *before* asking the
-    // server to play it, so local state stays correct even if the reply is
-    // slow, empty, or never arrives - previously the queue only updated
-    // after `song_played` came back, which could leave a track stuck at
-    // the front of the queue (or replay forever) if that response was empty.
-    function playTrackFromQueue(index) {
-      if (index < 0 || index >= currentPlaylist.length) return;
-      const [track] = currentPlaylist.splice(index, 1);
+    function playTrackFromQueue(track) {
+      const index = currentPlaylist.indexOf(track);
+      if (index === -1) return;
+      currentPlaylist.splice(index, 1);
       if (preShuffleOrder) {
         preShuffleOrder = preShuffleOrder.filter(id => id !== track.videoId);
       }
@@ -1610,15 +1562,10 @@
         pushHistory(currentSong);
       }
       refreshPlaylistPanel();
-      // radio:false - we already have a queue; continuation is handled by
-      // maybeExtendQueue() rather than asking the server to build a fresh
-      // radio on every single track change.
       socket.emit('play_song', { video_id: track.videoId, radio: false });
     }
 
     function playNext(auto) {
-      // Repeat-one only kicks in on automatic (track-ended) advances, not
-      // when the user explicitly presses "next" - matches YouTube Music.
       if (auto && repeatMode === 'one' && currentSong) {
         audioPlayer.currentTime = 0;
         audioPlayer.play().then(() => {
@@ -1629,7 +1576,7 @@
       }
 
       if (currentPlaylist.length > 0) {
-        playTrackFromQueue(0);
+        playTrackFromQueue(currentPlaylist[0]);
         maybeExtendQueue();
         return;
       }
@@ -1640,7 +1587,7 @@
         songHistory = [];
         preShuffleOrder = null;
         if (currentPlaylist.length > 0) {
-          playTrackFromQueue(0);
+          playTrackFromQueue(currentPlaylist[0]);
           return;
         }
       }
@@ -1761,47 +1708,22 @@
       refreshPlaylistPanel();
     }
 
-    function clearHistory() {
-      songHistory = [];
-      refreshPlaylistPanel();
-    }
-
-    function handleClearButtonClick() {
-      if (playlistViewMode === 'history') {
-        clearHistory();
-      } else {
-        clearQueue();
-      }
-    }
-
-    function updateClearButtonLabels() {
-      const label = playlistViewMode === 'history' ? 'Clear history' : 'Clear queue';
-      [clearQueueBtn, mobileClearQueueBtn].forEach(btn => {
-        if (!btn) return;
-        btn.title = label;
-        btn.setAttribute('aria-label', label);
-      });
-    }
-
-    function removeFromQueue(index) {
-      if (index < 0 || index >= currentPlaylist.length) return;
-      const [removed] = currentPlaylist.splice(index, 1);
-      if (preShuffleOrder && removed) {
-        preShuffleOrder = preShuffleOrder.filter(id => id !== removed.videoId);
+    function removeFromQueue(track) {
+      const index = currentPlaylist.indexOf(track);
+      if (index === -1) return;
+      currentPlaylist.splice(index, 1);
+      if (preShuffleOrder) {
+        preShuffleOrder = preShuffleOrder.filter(id => id !== track.videoId);
       }
       refreshPlaylistPanel();
     }
 
-    // Rewinds playback to an earlier song in history. Everything that was
-    // played *after* that song (plus the current track) gets pushed back
-    // onto the front of the queue, in order, so pressing "next" continues
-    // exactly where it would have before you jumped back.
-    function playFromHistory(historyIndex) {
-      if (historyIndex < 0 || historyIndex >= songHistory.length) return;
-      const target = songHistory[historyIndex];
-      const targetVideoId = target.videoId || target.video_id;
+    function playFromHistory(song) {
+      const historyIndex = songHistory.indexOf(song);
+      if (historyIndex === -1) return;
+      const targetVideoId = song.videoId || song.video_id;
       if (!targetVideoId) {
-        console.warn('Skipping history entry with no video id:', target);
+        console.warn('Skipping history entry with no video id:', song);
         return;
       }
       const playedAfter = songHistory.slice(historyIndex + 1);
@@ -1818,30 +1740,33 @@
       socket.emit('play_song', { video_id: targetVideoId, radio: false });
     }
 
-    // Shared "album art or fallback icon" thumbnail, used by both the
-    // up-next queue and the history list so a missing/broken image never
-    // leaves a blank gap.
     function createTrackMediaElement(thumbnailUrl, altText) {
       const media = document.createElement('div');
       media.className = 'playlist-item-media';
-      const lowRes = getLowResThumbnail(thumbnailUrl);
-      if (lowRes) {
-        const img = document.createElement('img');
-        img.className = 'playlist-item-thumbnail';
-        img.alt = altText || '';
-        img.loading = 'lazy';
-        img.src = lowRes;
-        img.addEventListener('error', () => {
-          media.innerHTML = '<i class="fas fa-music playlist-item-icon"></i>';
-        }, { once: true });
-        media.appendChild(img);
-      } else {
+      if (!thumbnailUrl) {
         media.innerHTML = '<i class="fas fa-music playlist-item-icon"></i>';
+        return media;
       }
+      const lowRes = getLowResThumbnail(thumbnailUrl);
+      const img = document.createElement('img');
+      img.className = 'playlist-item-thumbnail';
+      img.alt = altText || '';
+      img.referrerPolicy = 'no-referrer';
+      let triedOriginal = lowRes === thumbnailUrl;
+      img.addEventListener('error', () => {
+        if (!triedOriginal) {
+          triedOriginal = true;
+          img.src = thumbnailUrl;
+          return;
+        }
+        media.innerHTML = '<i class="fas fa-music playlist-item-icon"></i>';
+      });
+      img.src = lowRes;
+      media.appendChild(img);
       return media;
     }
 
-    function createPlaylistItemElement(track, index, closeMobileOnPlay) {
+    function createPlaylistItemElement(track, closeMobileOnPlay) {
       const div = document.createElement('div');
       div.className = 'playlist-item';
 
@@ -1862,7 +1787,7 @@
       removeBtn.innerHTML = '<i class="fas fa-times"></i>';
       removeBtn.addEventListener('click', (event) => {
         event.stopPropagation();
-        removeFromQueue(index);
+        removeFromQueue(track);
       });
 
       div.appendChild(media);
@@ -1870,7 +1795,7 @@
       div.appendChild(removeBtn);
 
       div.addEventListener('click', () => {
-        playTrackFromQueue(index);
+        playTrackFromQueue(track);
         if (closeMobileOnPlay) {
           mobilePlaylistView.classList.remove('visible');
           isMobilePlaylistOpen = false;
@@ -1880,7 +1805,7 @@
       return div;
     }
 
-    function createHistoryItemElement(song, historyIndex, closeMobileOnPlay) {
+    function createHistoryItemElement(song, closeMobileOnPlay) {
       const track = songToTrackShape(song);
       const div = document.createElement('div');
       div.className = 'playlist-item history-item';
@@ -1902,7 +1827,7 @@
       playAgainBtn.innerHTML = '<i class="fas fa-history"></i>';
       playAgainBtn.addEventListener('click', (event) => {
         event.stopPropagation();
-        playFromHistory(historyIndex);
+        playFromHistory(song);
         if (closeMobileOnPlay) {
           mobilePlaylistView.classList.remove('visible');
           isMobilePlaylistOpen = false;
@@ -1914,7 +1839,7 @@
       div.appendChild(playAgainBtn);
 
       div.addEventListener('click', () => {
-        playFromHistory(historyIndex);
+        playFromHistory(song);
         if (closeMobileOnPlay) {
           mobilePlaylistView.classList.remove('visible');
           isMobilePlaylistOpen = false;
@@ -1924,84 +1849,134 @@
       return div;
     }
 
-    function renderQueueList() {
-      if (!currentPlaylist || currentPlaylist.length === 0) {
-        const emptyMsg = '<div class="playlist-empty">No upcoming songs — search to start a radio, or add tracks to the queue.</div>';
-        playlistList.innerHTML = emptyMsg;
-        mobilePlaylistList.innerHTML = emptyMsg;
-        return;
-      }
-      playlistList.innerHTML = '';
-      mobilePlaylistList.innerHTML = '';
-      currentPlaylist.forEach((track, index) => {
-        playlistList.appendChild(createPlaylistItemElement(track, index, false));
-        mobilePlaylistList.appendChild(createPlaylistItemElement(track, index, true));
-      });
+    function createNowPlayingElement(song) {
+      const track = songToTrackShape(song);
+      const div = document.createElement('div');
+      div.className = 'playlist-item playlist-now-playing';
+
+      const media = createTrackMediaElement(track.thumbnailUrl, track.title);
+
+      const info = document.createElement('div');
+      info.className = 'playlist-item-info';
+      info.innerHTML = `
+        <div class="playlist-item-title">${escapeHtml(track.title)}</div>
+        <div class="playlist-item-artist">${escapeHtml(track.artist)}</div>
+      `;
+
+      const eq = document.createElement('span');
+      eq.className = 'eq-indicator';
+      eq.classList.toggle('hidden', !isPlaying);
+      eq.setAttribute('aria-hidden', 'true');
+      eq.innerHTML = '<span></span><span></span><span></span>';
+
+      div.appendChild(media);
+      div.appendChild(info);
+      div.appendChild(eq);
+
+      div.addEventListener('click', togglePlayPause);
+
+      return div;
     }
 
-    function renderHistoryList() {
-      if (!songHistory || songHistory.length === 0) {
-        const emptyMsg = '<div class="playlist-empty">Songs you\'ve played will show up here.</div>';
-        playlistList.innerHTML = emptyMsg;
-        mobilePlaylistList.innerHTML = emptyMsg;
-        return;
+    let nextItemKeyId = 1;
+    const itemKeys = new WeakMap();
+    function keyFor(obj) {
+      if (!itemKeys.has(obj)) {
+        itemKeys.set(obj, `k${nextItemKeyId++}`);
       }
-      playlistList.innerHTML = '';
-      mobilePlaylistList.innerHTML = '';
-      // Most recently played first.
-      for (let i = songHistory.length - 1; i >= 0; i--) {
-        playlistList.appendChild(createHistoryItemElement(songHistory[i], i, false));
-        mobilePlaylistList.appendChild(createHistoryItemElement(songHistory[i], i, true));
-      }
+      return itemKeys.get(obj);
     }
 
-    function setPlaylistViewMode(mode) {
-      playlistViewMode = mode;
-      const isHistory = mode === 'history';
-      [queueTabBtn, mobileQueueTabBtn].forEach(btn => {
-        if (!btn) return;
-        btn.classList.toggle('active', !isHistory);
-        btn.setAttribute('aria-selected', String(!isHistory));
+    function reconcileList(container, entries, emptyMessage) {
+      if (!container.__keyedNodes) container.__keyedNodes = new Map();
+      const keyedNodes = container.__keyedNodes;
+
+      if (entries.length === 0) {
+        container.innerHTML = `<div class="playlist-empty">${emptyMessage}</div>`;
+        keyedNodes.clear();
+        return null;
+      }
+
+      const stalePlaceholder = container.querySelector(':scope > .playlist-empty');
+      if (stalePlaceholder) stalePlaceholder.remove();
+
+      const usedKeys = new Set();
+      let prevNode = null;
+      let nowPlayingNode = null;
+
+      entries.forEach(entry => {
+        usedKeys.add(entry.key);
+        let node = keyedNodes.get(entry.key);
+        if (!node || !node.isConnected) {
+          node = entry.build();
+          keyedNodes.set(entry.key, node);
+        }
+        const desiredNext = prevNode ? prevNode.nextSibling : container.firstChild;
+        if (desiredNext !== node) {
+          container.insertBefore(node, desiredNext);
+        }
+        if (entry.isNowPlaying) nowPlayingNode = node;
+        prevNode = node;
       });
-      [historyTabBtn, mobileHistoryTabBtn].forEach(btn => {
-        if (!btn) return;
-        btn.classList.toggle('active', isHistory);
-        btn.setAttribute('aria-selected', String(isHistory));
+
+      keyedNodes.forEach((node, key) => {
+        if (!usedKeys.has(key)) {
+          node.remove();
+          keyedNodes.delete(key);
+        }
       });
-      updateClearButtonLabels();
-      refreshPlaylistPanel();
+
+      return nowPlayingNode;
     }
 
-    // Single entry point for "the queue or history changed" - keeps both
-    // tab counters accurate (even for the tab that isn't currently shown),
-    // re-renders whichever list is active, and kicks off queue refill /
-    // prefetching as needed.
+    function renderMergedPlaylist(container) {
+      const closeMobileOnPlay = container === mobilePlaylistList;
+      const entries = [];
+
+      songHistory.forEach(song => {
+        entries.push({ key: `hist:${keyFor(song)}`, build: () => createHistoryItemElement(song, closeMobileOnPlay) });
+      });
+
+      if (currentSong) {
+        entries.push({
+          key: `now:${keyFor(currentSong)}`,
+          isNowPlaying: true,
+          build: () => createNowPlayingElement(currentSong),
+        });
+      }
+
+      currentPlaylist.forEach(track => {
+        entries.push({ key: `queue:${keyFor(track)}`, build: () => createPlaylistItemElement(track, closeMobileOnPlay) });
+      });
+
+      return reconcileList(container, entries, 'Search for a song to start a radio.');
+    }
+
     function refreshPlaylistPanel() {
-      if (queueCount) queueCount.textContent = String(currentPlaylist.length);
-      if (mobileQueueCount) mobileQueueCount.textContent = String(currentPlaylist.length);
-      if (historyCount) historyCount.textContent = String(songHistory.length);
-      if (mobileHistoryCount) mobileHistoryCount.textContent = String(songHistory.length);
+      const totalCount = songHistory.length + (currentSong ? 1 : 0) + currentPlaylist.length;
+      if (queueCount) queueCount.textContent = String(totalCount);
+      if (mobileQueueCount) mobileQueueCount.textContent = String(totalCount);
 
-      if (playlistViewMode === 'history') {
-        renderHistoryList();
-      } else {
-        renderQueueList();
+      const desktopNowPlaying = renderMergedPlaylist(playlistList);
+      const mobileNowPlaying = renderMergedPlaylist(mobilePlaylistList);
+
+      if (pendingScrollToCurrent) {
+        pendingScrollToCurrent = false;
+        [desktopNowPlaying, mobileNowPlaying].forEach(el => {
+          if (el) el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+        });
       }
 
       updateMobileUpNext();
       schedulePrefetch();
     }
 
-    // Ask the server to warm the stream-url cache for the next few tracks
-    // in the queue, so pressing "next" (or auto-advance) is instant instead
-    // of waiting on a fresh yt-dlp extraction.
     function schedulePrefetch() {
       const upcoming = currentPlaylist.slice(0, PREFETCH_COUNT).map(t => t.videoId).filter(Boolean);
       const toFetch = upcoming.filter(id => !prefetchedIds.has(id));
       if (toFetch.length === 0) return;
       toFetch.forEach(id => prefetchedIds.add(id));
       if (prefetchedIds.size > PREFETCHED_IDS_CAP) {
-        // Cheap unbounded-growth guard: once too big, just start a fresh set.
         prefetchedIds = new Set(toFetch);
       }
       socket.emit('prefetch_tracks', { video_ids: toFetch });
@@ -2056,9 +2031,6 @@
       songLoading.classList.add('hidden');
       playSong(song);
 
-      // The queue itself was already updated (item removed) before this
-      // request was sent - see playTrackFromQueue/playPrevious. Here we
-      // only ever *add* whatever fresh radio tracks the server included.
       if (Array.isArray(song.playlist) && song.playlist.length > 0) {
         const knownIds = new Set(currentPlaylist.map(t => t.videoId));
         const currentId = song.videoId;
@@ -2083,9 +2055,6 @@
       currentPlaylist.push(...newTracks);
       if (preShuffleOrder) preShuffleOrder.push(...newTracks.map(t => t.videoId));
       refreshPlaylistPanel();
-      // Still short of the target? Ask for another batch, seeded from the
-      // newest track, so a single low-watermark trigger can refill the
-      // whole queue rather than only adding one small batch.
       maybeExtendQueue();
     });
 
@@ -2274,13 +2243,10 @@
 
     [shuffleBtn, mobileShuffleBtn].forEach(btn => btn && btn.addEventListener('click', toggleShuffle));
     [repeatBtn, mobileRepeatBtn].forEach(btn => btn && btn.addEventListener('click', cycleRepeatMode));
-    [clearQueueBtn, mobileClearQueueBtn].forEach(btn => btn && btn.addEventListener('click', handleClearButtonClick));
-    [queueTabBtn, mobileQueueTabBtn].forEach(btn => btn && btn.addEventListener('click', () => setPlaylistViewMode('queue')));
-    [historyTabBtn, mobileHistoryTabBtn].forEach(btn => btn && btn.addEventListener('click', () => setPlaylistViewMode('history')));
+    [clearQueueBtn, mobileClearQueueBtn].forEach(btn => btn && btn.addEventListener('click', clearQueue));
 
     updateShuffleButtons();
     updateRepeatButtons();
-    updateClearButtonLabels();
     refreshPlaylistPanel();
 
     mobileUpNextBar.addEventListener('click', () => {
