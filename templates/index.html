@@ -16,19 +16,11 @@
     body {
       font-family: 'Arial', sans-serif;
       background: linear-gradient(135deg, #5e4591, #6935d1);
-      background-size: 200% 200%;
-      animation: gradientShift 18s ease infinite;
       color: #fff;
       margin: 0;
       overflow: hidden;
       transition: background 0.6s ease;
       height: 100vh;
-    }
-
-    @keyframes gradientShift {
-      0% { background-position: 0% 50%; }
-      50% { background-position: 100% 50%; }
-      100% { background-position: 0% 50%; }
     }
 
     @keyframes fadeIn {
@@ -54,8 +46,6 @@
       right: 0;
       z-index: 30;
       padding: 16px;
-      background: rgba(255, 255, 255, 0.1);
-      backdrop-filter: blur(12px);
     }
 
     .search-input-container {
@@ -696,6 +686,7 @@
     .playlist-list {
       flex: 1;
       overflow-y: auto;
+      overflow-x: hidden;
       scrollbar-width: thin;
       scrollbar-color: rgba(255, 255, 255, 0.4) transparent;
     }
@@ -769,7 +760,7 @@
 
     .playlist-item-info {
       flex: 1;
-      overflow: hidden;
+      min-width: 0;;
     }
 
     .playlist-item-title {
@@ -1196,6 +1187,11 @@
 
     let isPlaying = false;
     let currentSong = null;
+    // The video id of the first song searched/started for the current radio
+    // session. All queue extensions use this seed (not the currently playing
+    // or last-queued track) so recommendations stay anchored to that first
+    // song instead of drifting as the queue grows.
+    let radioSeedVideoId = null;
     let currentPlaylist = [];
     let currentIndex = -1;
     let songHistory = [];
@@ -1216,9 +1212,10 @@
     let isExtendingQueue = false;
     let pendingScrollToCurrent = false;
 
-    const PREFETCH_COUNT = 4;
+    const PREFETCH_COUNT = 5;
     const PREFETCHED_IDS_CAP = 300;
-    let prefetchedIds = new Set();
+    const PREFETCH_TTL_MS = 480 * 1000;
+    let prefetchedAt = new Map();
 
     function escapeHtml(value) {
       const div = document.createElement('div');
@@ -1249,7 +1246,6 @@
       }
     }
 
-    // Initialize Media Session handlers
     if ('mediaSession' in navigator) {
       navigator.mediaSession.setActionHandler('play', () => {
         togglePlayPause();
@@ -1427,12 +1423,14 @@
         document.body.style.background = defaultGradient;
         mobilePlaylistView.style.background = defaultGradient;
       });
+    }
 
+    function initParticles() {
       particlesJS("particles-js", {
         particles: {
           number: { value: 60, density: { enable: true, value_area: 800 } },
           color: { value: "#ffffff" },
-          shape: { type: "circle", stroke: { width: 0, color: "#000000" } },
+          shape: { type: "circle",stroke: { width: 0, color: "#000000" } },
           opacity: { value: 0.5, random: true, anim: { enable: false } },
           size: { value: 12, random: true, anim: { enable: false } },
           line_linked: { enable: false },
@@ -1640,9 +1638,10 @@
       if (repeatMode === 'one') return;
       if (currentPlaylist.length >= TARGET_QUEUE_SIZE) return;
       if (currentPlaylist.length > QUEUE_LOW_WATERMARK) return;
-      const seed = currentPlaylist.length > 0
-        ? currentPlaylist[currentPlaylist.length - 1].videoId
-        : (currentSong ? (currentSong.videoId || currentSong.video_id) : null);
+      const seed = radioSeedVideoId
+        || (currentPlaylist.length > 0
+          ? currentPlaylist[currentPlaylist.length - 1].videoId
+          : (currentSong ? (currentSong.videoId || currentSong.video_id) : null));
       if (!seed) return;
       isExtendingQueue = true;
       const needed = TARGET_QUEUE_SIZE - currentPlaylist.length;
@@ -1973,11 +1972,21 @@
 
     function schedulePrefetch() {
       const upcoming = currentPlaylist.slice(0, PREFETCH_COUNT).map(t => t.videoId).filter(Boolean);
-      const toFetch = upcoming.filter(id => !prefetchedIds.has(id));
+      const upcomingSet = new Set(upcoming);
+      const now = Date.now();
+      for (const id of prefetchedAt.keys()) {
+        if (!upcomingSet.has(id)) prefetchedAt.delete(id);
+      }
+
+      const toFetch = upcoming.filter(id => {
+        const lastFetched = prefetchedAt.get(id);
+        return lastFetched === undefined || (now - lastFetched) >= PREFETCH_TTL_MS;
+      });
       if (toFetch.length === 0) return;
-      toFetch.forEach(id => prefetchedIds.add(id));
-      if (prefetchedIds.size > PREFETCHED_IDS_CAP) {
-        prefetchedIds = new Set(toFetch);
+
+      toFetch.forEach(id => prefetchedAt.set(id, now));
+      if (prefetchedAt.size > PREFETCHED_IDS_CAP) {
+        prefetchedAt = new Map(toFetch.map(id => [id, now]));
       }
       socket.emit('prefetch_tracks', { video_ids: toFetch });
     }
@@ -2032,6 +2041,9 @@
       playSong(song);
 
       if (Array.isArray(song.playlist) && song.playlist.length > 0) {
+        if (!radioSeedVideoId) {
+          radioSeedVideoId = song.videoId || null;
+        }
         const knownIds = new Set(currentPlaylist.map(t => t.videoId));
         const currentId = song.videoId;
         if (currentId) knownIds.add(currentId);
@@ -2208,6 +2220,8 @@
           currentPlaylist = [];
           songHistory = [];
           preShuffleOrder = null;
+          radioSeedVideoId = song.videoId || null;
+          prefetchedAt = new Map();
           socket.emit('play_song', { video_id: song.videoId });
         });
         searchSuggestions.appendChild(li);
@@ -2420,6 +2434,8 @@
           });
       });
     }
+
+    initParticles();
   </script>
 </body>
 </html>
