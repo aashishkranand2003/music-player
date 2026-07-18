@@ -4,4 +4,3 @@ eventlet
 ytmusicapi
 yt-dlp
 requests
-gunicorn
