@@ -3,6 +3,7 @@ import os
 import socket
 import threading
 import time
+import random
 from urllib.parse import unquote, urlparse
 import eventlet
 eventlet.monkey_patch()
@@ -10,23 +11,25 @@ import requests
 from flask import Flask, Response, jsonify, render_template, request
 from flask_socketio import SocketIO, emit
 from ytmusicapi import YTMusic
-try:
-    import yt_dlp
-except ImportError as exc:  
-    raise RuntimeError("yt-dlp is required. Install it with: pip install yt-dlp") from exc
+import yt_dlp  
 
-# --------------------------------------------------------------------------
-# Logging
-# --------------------------------------------------------------------------
+
+
 logging.basicConfig(
     level=os.environ.get("LOG_LEVEL", "INFO"),
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
 )
 logger = logging.getLogger("music_player")
 
-# --------------------------------------------------------------------------
-# App / config
-# --------------------------------------------------------------------------
+USER_AGENTS = [
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36",
+]
+
+
 app = Flask(__name__)
 
 _secret_key = os.environ.get("FLASK_SECRET_KEY")
@@ -41,26 +44,25 @@ socketio = SocketIO(
     engineio_logger=False,
 )
 
-REQUEST_TIMEOUT = 15  # seconds
-CACHE_TIMEOUT = 500  # seconds
+REQUEST_TIMEOUT = 15
+CACHE_TIMEOUT = 500
 CACHE_MAX_ENTRIES = 50
-CACHE_CLEAN_INTERVAL = 300  # seconds
-INITIAL_QUEUE_SIZE = 30  # up-next tracks fetched when a fresh radio starts
-EXTEND_BATCH_SIZE = 10  # up-next tracks fetched per queue-extend call
-MAX_RADIO_BATCH = 30  # hard cap on any single radio/extend request, client-requested or not
-MAX_PREFETCH_PER_REQUEST = 4  # how many tracks a client can ask to prefetch at once
+CACHE_CLEAN_INTERVAL = 300
+INITIAL_QUEUE_SIZE = 30
+EXTEND_BATCH_SIZE = 10
+MAX_RADIO_BATCH = 30
+MAX_PREFETCH_PER_REQUEST = 10
 
 stream_url_cache = {}
 _cache_lock = threading.Lock()
 
-# --------------------------------------------------------------------------
-# YTMusic client
-# --------------------------------------------------------------------------
+session_radio_seed = {}
+_seed_lock = threading.Lock()
+
+
 ytmusic = YTMusic()
 
-# --------------------------------------------------------------------------
-# Cache maintenance
-# --------------------------------------------------------------------------
+
 def _clean_stream_cache():
     while True:
         eventlet.sleep(CACHE_CLEAN_INTERVAL)
@@ -81,9 +83,7 @@ def _clean_stream_cache():
         except Exception:
             logger.exception("Error while cleaning stream cache")
 
-# --------------------------------------------------------------------------
-# Routes
-# --------------------------------------------------------------------------
+
 @app.route("/")
 def index():
     return render_template("index.html")
@@ -180,9 +180,7 @@ def search_suggestions():
 
     return jsonify(suggestions)
 
-# --------------------------------------------------------------------------
-# Socket.IO handlers
-# --------------------------------------------------------------------------
+
 @socketio.on("connect")
 def handle_connect():
     logger.info("Client connected: %s", request.sid)
@@ -190,6 +188,8 @@ def handle_connect():
 @socketio.on("disconnect")
 def handle_disconnect(reason=None):
     logger.info("Client disconnected: %s", request.sid)
+    with _seed_lock:
+        session_radio_seed.pop(request.sid, None)
 
 @socketio.on_error_default
 def default_error_handler(e):
@@ -248,6 +248,14 @@ def play_song(data):
         else []
     )
 
+    if want_radio and playlist_tracks:
+        with _seed_lock:
+            session_radio_seed[request.sid] = video_id
+            logger.debug(
+                "New radio seed for session %s: %s (title: %s)",
+                request.sid, video_id, title
+            )
+
     song_data = {
         "stream_url": stream_url,
         "thumbnail_url": thumbnail_url,
@@ -265,15 +273,25 @@ def extend_queue(data):
         emit("queue_extend_error", {"error": "Invalid request"}, room=request.sid)
         return
 
-    video_id = (data.get("video_id") or "").strip() or None
-    if not video_id:
-        emit("queue_extend_error", {"error": "No seed track specified"}, room=request.sid)
-        return
+    with _seed_lock:
+        seed_video_id = session_radio_seed.get(request.sid)
+
+    if not seed_video_id:
+        raw_video_id = (data.get("video_id") or "").strip() or None
+        if raw_video_id:
+            seed_video_id = raw_video_id
+        else:
+            emit(
+                "queue_extend_error",
+                {"error": "No seed track for radio available"},
+                room=request.sid
+            )
+            return
 
     raw_exclude = data.get("exclude") or []
     if not isinstance(raw_exclude, list):
         raw_exclude = []
-    exclude_ids = {video_id} | {str(x).strip() for x in raw_exclude if str(x).strip()}
+    exclude_ids = {seed_video_id} | {str(x).strip() for x in raw_exclude if str(x).strip()}
 
     try:
         requested_limit = int(data.get("limit", EXTEND_BATCH_SIZE))
@@ -281,12 +299,16 @@ def extend_queue(data):
         requested_limit = EXTEND_BATCH_SIZE
     limit = max(1, min(requested_limit, MAX_RADIO_BATCH))
 
-    tracks = _get_radio_tracks(video_id, exclude_ids=exclude_ids, limit=limit)
+    tracks = _get_radio_tracks(seed_video_id, exclude_ids=exclude_ids, limit=limit)
     if not tracks:
         emit("queue_extend_error", {"error": "Couldn't find more tracks for this radio"}, room=request.sid)
         return
 
-    emit("queue_extended", {"seed_video_id": video_id, "tracks": tracks}, room=request.sid)
+    logger.debug(
+        "Extended queue for session %s using seed %s: got %d tracks",
+        request.sid, seed_video_id, len(tracks)
+    )
+    emit("queue_extended", {"seed_video_id": seed_video_id, "tracks": tracks}, room=request.sid)
 
 @socketio.on("prefetch_tracks")
 def prefetch_tracks(data):
@@ -307,6 +329,10 @@ def prefetch_tracks(data):
         if len(video_ids) >= MAX_PREFETCH_PER_REQUEST:
             break
 
+    logger.debug(
+        "Prefetch request for session %s: %d tracks",
+        request.sid, len(video_ids)
+    )
     for video_id in video_ids:
         socketio.start_background_task(_prefetch_stream_url, video_id)
 
@@ -316,7 +342,7 @@ def _prefetch_stream_url(video_id):
         with _cache_lock:
             cached = stream_url_cache.get(video_url)
         if cached and time.time() - cached[1] < CACHE_TIMEOUT:
-            return  # already warm
+            return
         get_audio_stream_url(video_url)
     except Exception:
         logger.exception("Prefetch failed for video_id=%r", video_id)
@@ -326,7 +352,7 @@ def _format_playlist_track(track):
     if not t_video_id:
         return None
     p_artists = track.get("artists") or []
-    p_thumbnails = track.get("thumbnails") or []
+    p_thumbnails = track.get("thumbnail") or track.get("thumbnails") or []
     return {
         "title": track.get("title") or "Unknown Title",
         "artist": p_artists[0]["name"] if p_artists and p_artists[0].get("name") else "Unknown Artist",
@@ -388,16 +414,21 @@ def get_audio_stream_url(youtube_url):
                 return url
 
         ydl_opts = {
-            "format": "bestaudio/m4a/opus/best/webm",
+            "format": "bestaudio/best",
             "quiet": True,
-            "noplaylist": False,
-            "http_chunk_size": 8192,
             "no_warnings": True,
-            "extract_flat": True,
-            "user_agent": (
-                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
-                "(KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
-            ),
+            "skip_download": True,
+            "noplaylist": True,
+            "extractor_retries": 3,
+            "socket_timeout": 10,
+            "http_headers": {
+                "User-Agent": random.choice(USER_AGENTS),
+                "Accept-Language": "en-US,en;q=0.9",
+                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            },
+            "sleep_interval": 1,
+            "sleep_interval_requests": 1,
+            "max_sleep_interval": 5,
         }
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info_dict = ydl.extract_info(youtube_url, download=False)
