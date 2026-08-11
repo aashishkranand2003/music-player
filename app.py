@@ -443,30 +443,21 @@ def get_audio_stream_url(youtube_url):
                 return url
 
         ydl_opts = {
-            "format": "bestaudio[ext=webm]/bestaudio[ext=m4a]/bestaudio/best",
+            "format": "bestaudio/best",
             "quiet": True,
             "no_warnings": True,
             "skip_download": True,
             "noplaylist": True,
-            "extractor_retries": 5,
-            "retries": 5,
-            "fragment_retries": 5,
-            "socket_timeout": 20,
+            "extractor_retries": 3,
+            "socket_timeout": 10,
             "http_headers": {
                 "User-Agent": random.choice(USER_AGENTS),
                 "Accept-Language": "en-US,en;q=0.9",
                 "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
             },
-            "extractor_args": {
-                "youtube": {
-                    "player_client": ["android_vr", "tv_downgraded", "web", "mweb"],
-                    "player_skip": ["webpage", "configs"],
-                }
-            },
             "sleep_interval": 1,
             "sleep_interval_requests": 1,
             "max_sleep_interval": 5,
-            "source_address": "0.0.0.0",
         }
 
         # Use cookies
@@ -479,26 +470,7 @@ def get_audio_stream_url(youtube_url):
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info_dict = ydl.extract_info(youtube_url, download=False)
 
-        if not info_dict:
-            logger.warning("No info returned for %s", youtube_url)
-            return None
-
-        stream_url = info_dict.get("url")
-        if not stream_url:
-            formats = info_dict.get("formats") or []
-            audio_formats = [
-                f for f in formats
-                if f.get("acodec") != "none" and f.get("vcodec") in (None, "none")
-                and f.get("url")
-            ]
-            if not audio_formats:
-                audio_formats = [f for f in formats if f.get("url")]
-            if audio_formats:
-                audio_formats.sort(
-                    key=lambda f: f.get("abr") or f.get("tbr") or 0,
-                    reverse=True,
-                )
-                stream_url = audio_formats[0]["url"]
+        stream_url = info_dict.get("url") if info_dict else None
 
         if not stream_url:
             logger.warning("No playable stream url found for %s", youtube_url)
@@ -507,11 +479,9 @@ def get_audio_stream_url(youtube_url):
         with _cache_lock:
             stream_url_cache[youtube_url] = (stream_url, current_time)
         return stream_url
-
     except Exception:
         logger.exception("Error getting audio stream URL for %s", youtube_url)
         return None
-
 
 if __name__ == "__main__":
     gevent.spawn(_clean_stream_cache)
