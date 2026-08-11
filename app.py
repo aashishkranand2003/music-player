@@ -1,10 +1,10 @@
 import logging
 import os
-import socket
+import tempfile
 import threading
 import time
 import random
-from urllib.parse import unquote, urlparse
+from urllib.parse import unquote
 from gevent import monkey
 monkey.patch_all()
 import gevent
@@ -56,30 +56,6 @@ session_radio_seed = {}
 _seed_lock = threading.Lock()
 
 ytmusic = YTMusic()
-
-# ========== COOKIES SETUP (Method 2) ==========
-COOKIES_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "cookies.txt")
-
-def setup_cookies():
-    """Create cookies.txt from environment variable if it doesn't exist"""
-    if os.path.isfile(COOKIES_FILE):
-        logger.info("cookies.txt already exists")
-        return
-
-    cookies_content = os.environ.get("COOKIES_CONTENT")
-    if cookies_content:
-        try:
-            with open(COOKIES_FILE, "w", encoding="utf-8") as f:
-                f.write(cookies_content)
-            logger.info("Successfully created cookies.txt from COOKIES_CONTENT environment variable")
-        except Exception as e:
-            logger.error("Failed to write cookies.txt: %s", e)
-    else:
-        logger.warning("COOKIES_CONTENT environment variable is not set")
-
-# Run this when the app starts
-setup_cookies()
-# ==============================================
 
 
 def _clean_stream_cache():
@@ -443,34 +419,80 @@ def get_audio_stream_url(youtube_url):
                 return url
 
         ydl_opts = {
-            "format": "bestaudio/best",
+            # More flexible format selection (fixes "Requested format is not available")
+            "format": "bestaudio[ext=webm]/bestaudio[ext=m4a]/bestaudio/best",
             "quiet": True,
             "no_warnings": True,
             "skip_download": True,
             "noplaylist": True,
-            "extractor_retries": 3,
-            "socket_timeout": 10,
+            "extractor_retries": 5,
+            "retries": 5,
+            "fragment_retries": 5,
+            "socket_timeout": 20,
             "http_headers": {
                 "User-Agent": random.choice(USER_AGENTS),
                 "Accept-Language": "en-US,en;q=0.9",
                 "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
             },
+            "extractor_args": {
+                "youtube": {
+                    "player_client": ["android_vr", "tv_downgraded", "web", "mweb"],
+                    "player_skip": ["webpage", "configs"],
+                }
+            },
             "sleep_interval": 1,
             "sleep_interval_requests": 1,
             "max_sleep_interval": 5,
+            "source_address": "0.0.0.0",
         }
 
-        # Use cookies
-        if os.path.isfile(COOKIES_FILE):
-            ydl_opts["cookiefile"] = COOKIES_FILE
-            logger.info("Using cookies from %s", COOKIES_FILE)
+        # ========== Use COOKIES_CONTENT environment variable ==========
+        cookies_content = os.environ.get("COOKIES_CONTENT")
+        cookies_temp_file = None
+
+        if cookies_content:
+            # Create a temporary cookies file
+            cookies_temp_file = tempfile.NamedTemporaryFile(
+                mode="w", suffix=".txt", delete=False, encoding="utf-8"
+            )
+            cookies_temp_file.write(cookies_content)
+            cookies_temp_file.close()
+            ydl_opts["cookiefile"] = cookies_temp_file.name
+            logger.info("Using cookies from COOKIES_CONTENT environment variable")
         else:
-            logger.warning("cookies.txt not found")
+            logger.warning("COOKIES_CONTENT environment variable is not set")
 
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info_dict = ydl.extract_info(youtube_url, download=False)
+        try:
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                info_dict = ydl.extract_info(youtube_url, download=False)
+        finally:
+            # Clean up temporary file
+            if cookies_temp_file and os.path.exists(cookies_temp_file.name):
+                try:
+                    os.unlink(cookies_temp_file.name)
+                except Exception:
+                    pass
 
-        stream_url = info_dict.get("url") if info_dict else None
+        if not info_dict:
+            logger.warning("No info returned for %s", youtube_url)
+            return None
+
+        stream_url = info_dict.get("url")
+        if not stream_url:
+            formats = info_dict.get("formats") or []
+            audio_formats = [
+                f for f in formats
+                if f.get("acodec") != "none" and f.get("vcodec") in (None, "none")
+                and f.get("url")
+            ]
+            if not audio_formats:
+                audio_formats = [f for f in formats if f.get("url")]
+            if audio_formats:
+                audio_formats.sort(
+                    key=lambda f: f.get("abr") or f.get("tbr") or 0,
+                    reverse=True,
+                )
+                stream_url = audio_formats[0]["url"]
 
         if not stream_url:
             logger.warning("No playable stream url found for %s", youtube_url)
@@ -479,9 +501,11 @@ def get_audio_stream_url(youtube_url):
         with _cache_lock:
             stream_url_cache[youtube_url] = (stream_url, current_time)
         return stream_url
+
     except Exception:
         logger.exception("Error getting audio stream URL for %s", youtube_url)
         return None
+
 
 if __name__ == "__main__":
     gevent.spawn(_clean_stream_cache)
