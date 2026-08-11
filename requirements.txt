@@ -1,6 +1,7 @@
 Flask
 Flask-SocketIO
-eventlet
+gevent
+gevent-websocket
 ytmusicapi
 yt-dlp
 requests
