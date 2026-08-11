@@ -5,8 +5,9 @@ import threading
 import time
 import random
 from urllib.parse import unquote, urlparse
-import eventlet
-eventlet.monkey_patch()
+from gevent import monkey
+monkey.patch_all()
+import gevent
 import requests
 from flask import Flask, Response, jsonify, render_template, request
 from flask_socketio import SocketIO, emit
@@ -37,7 +38,7 @@ app.config["SECRET_KEY"] = _secret_key
 
 socketio = SocketIO(
     app,
-    async_mode="eventlet",
+    async_mode="gevent",
     cors_allowed_origins=os.environ.get("CORS_ALLOWED_ORIGINS", "*"),
     manage_session=False,
     logger=False,
@@ -65,7 +66,7 @@ ytmusic = YTMusic()
 
 def _clean_stream_cache():
     while True:
-        eventlet.sleep(CACHE_CLEAN_INTERVAL)
+        gevent.sleep(CACHE_CLEAN_INTERVAL)
         try:
             now = time.time()
             with _cache_lock:
