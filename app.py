@@ -419,10 +419,10 @@ def get_audio_stream_url(youtube_url):
             "no_warnings": True,
             "skip_download": True,
             "noplaylist": True,
-            "extractor_retries": 3,
-            "retries": 3,
-            "fragment_retries": 3,
-            "socket_timeout": 15,
+            "extractor_retries": 5,
+            "retries": 5,
+            "fragment_retries": 5,
+            "socket_timeout": 20,
             "http_headers": {
                 "User-Agent": random.choice(USER_AGENTS),
                 "Accept-Language": "en-US,en;q=0.9",
@@ -430,10 +430,12 @@ def get_audio_stream_url(youtube_url):
             },
             "extractor_args": {
                 "youtube": {
-                    "player_client": ["android", "web", "mweb", "tv_downgraded"],
+                    "player_client": ["android_vr", "tv_downgraded", "web", "mweb"],
                     "player_skip": ["webpage", "configs"],
                 }
             },
+            "js_runtimes": ["node"],
+            "remote_components": ["ejs:github"],
             "sleep_interval": 1,
             "sleep_interval_requests": 1,
             "max_sleep_interval": 5,
