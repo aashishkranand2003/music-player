@@ -413,6 +413,15 @@ def get_audio_stream_url(youtube_url):
             url, timestamp = cached
             if current_time - timestamp < CACHE_TIMEOUT:
                 return url
+        proxy = None
+        proxies_env = os.environ.get("YTDLP_PROXIES") or os.environ.get("YTDLP_PROXY")
+        if proxies_env:
+            proxy_list = [p.strip() for p in proxies_env.split(",") if p.strip()]
+            if proxy_list:
+                proxy = random.choice(proxy_list)
+                logger.debug("Using proxy: %s", proxy.split("@")[-1] if "@" in proxy else proxy)
+
+        cookies_file = os.environ.get("YTDLP_COOKIES")
 
         ydl_opts = {
             "format": "bestaudio/best",
@@ -421,20 +430,63 @@ def get_audio_stream_url(youtube_url):
             "skip_download": True,
             "noplaylist": True,
             "extractor_retries": 3,
-            "socket_timeout": 10,
+            "retries": 3,
+            "fragment_retries": 3,
+            "socket_timeout": 20,
             "http_headers": {
                 "User-Agent": random.choice(USER_AGENTS),
                 "Accept-Language": "en-US,en;q=0.9",
                 "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
             },
+            "extractor_args": {
+                "youtube": {
+                    "player_client": [
+                        "android_vr",
+                        "tv_downgraded",
+                        "mweb",
+                        "web",
+                        "android",
+                    ],
+                }
+            },
             "sleep_interval": 1,
             "sleep_interval_requests": 1,
             "max_sleep_interval": 5,
         }
+
+        if proxy:
+            ydl_opts["proxy"] = proxy
+
+        if cookies_file and os.path.isfile(cookies_file):
+            ydl_opts["cookiefile"] = cookies_file
+            logger.debug("Using cookies from %s", cookies_file)
+
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info_dict = ydl.extract_info(youtube_url, download=False)
 
-        stream_url = info_dict.get("url") if info_dict else None
+        if not info_dict:
+            logger.warning("No info returned for %s", youtube_url)
+            return None
+
+        stream_url = info_dict.get("url")
+
+        if not stream_url:
+            formats = info_dict.get("formats") or []
+            audio_formats = [
+                f for f in formats
+                if f.get("acodec") != "none"
+                and f.get("vcodec") in (None, "none")
+                and f.get("url")
+            ]
+            if not audio_formats:
+                audio_formats = [f for f in formats if f.get("url")]
+
+            if audio_formats:
+                audio_formats.sort(
+                    key=lambda f: f.get("abr") or f.get("tbr") or 0,
+                    reverse=True,
+                )
+                stream_url = audio_formats[0]["url"]
 
         if not stream_url:
             logger.warning("No playable stream url found for %s", youtube_url)
@@ -442,7 +494,9 @@ def get_audio_stream_url(youtube_url):
 
         with _cache_lock:
             stream_url_cache[youtube_url] = (stream_url, current_time)
+
         return stream_url
+
     except Exception:
         logger.exception("Error getting audio stream URL for %s", youtube_url)
         return None
