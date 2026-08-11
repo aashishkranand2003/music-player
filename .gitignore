@@ -1,3 +1,4 @@
+cookies.txt
 services:
   - type: web
     name: music-player
