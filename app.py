@@ -446,26 +446,8 @@ def get_audio_stream_url(youtube_url):
         logger.exception("Error getting audio stream URL for %s", youtube_url)
         return None
 
-def get_local_ip():
-    s = None
-    try:
-        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        s.settimeout(1)
-        s.connect(("8.8.8.8", 80))
-        return s.getsockname()[0]
-    except OSError:
-        return "localhost"
-    finally:
-        if s is not None:
-            s.close()
-
 if __name__ == "__main__":
-    server_port = int(os.environ.get("PORT", 5000))
-    server_ip = get_local_ip()
     threading.Thread(target=_clean_stream_cache, daemon=True).start()
-    logger.info("Server running on http://%s:%s", server_ip, server_port)
-    try:
-        socketio.run(app, host="0.0.0.0", port=server_port)
-    except Exception:
-        logger.exception("Server crashed")
-        raise
+    socketio.run(app)
+
+
