@@ -447,5 +447,4 @@ def get_audio_stream_url(youtube_url):
         return None
 
 if __name__ == "__main__":
-    threading.Thread(target=_clean_stream_cache, daemon=True).start()
-    socketio.run(app, host="0.0.0.0", port=server_port)
+    socketio.run(app)
