@@ -1,9 +1,0 @@
-# Netscape HTTP Cookie File
-# https://curl.haxx.se/rfc/cookie_spec.html
-# This is a generated file! Do not edit.
-
-.youtube.com	TRUE	/	TRUE	0	YSC	5Trs1YU4fOI
-.youtube.com	TRUE	/	TRUE	1802038748	VISITOR_INFO1_LIVE	YZ2end8FqeQ
-.youtube.com	TRUE	/	TRUE	1802038748	VISITOR_PRIVACY_METADATA	CgJJThIEGgAgDA%3D%3D
-.youtube.com	TRUE	/	TRUE	1802038744	__Secure-YNID	20.YT=VnPmuQx1avnwDMiOjzYsTptfxqgWcWaB8vld5eUjGkPhJGHuC4Yy9f8mEAR00M8VjRLYSOd31Vb5XLPffyM-5ITMJa_T6XsLiDEMhMouXE3ff6eZPANKqoCteZn4lTDZMUP5a5rzj4sgmKhZy8oHubwB-sCd9aUj-TAbw0e8B_De7vbbiLb2M9N0_dXwWAsvSZRZAxwDn5S4qrIuul2LBKdjQCBCuw7PANjAQrtiAQEfMuM2n5qvLWzQLYpMxozzAj2Sy04KmSdKSdZQi1oGYUfaMBGrL6xOrEe_1Za79sFM7xpOW1Crp5jWgp3AhT5IQ5hwYqc-5Vmbh1-MkumxHw
-.youtube.com	TRUE	/	TRUE	1802038745	__Secure-ROLLOUT_TOKEN	CLTTt9Hk26TF3QEQxamI3s2ZlgMYpduV3s2ZlgM%3D
