@@ -12,8 +12,7 @@ import requests
 from flask import Flask, Response, jsonify, render_template, request
 from flask_socketio import SocketIO, emit
 from ytmusicapi import YTMusic
-import yt_dlp  
-
+import yt_dlp
 
 logging.basicConfig(
     level=os.environ.get("LOG_LEVEL", "INFO"),
@@ -29,10 +28,8 @@ USER_AGENTS = [
     "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36",
 ]
 
-
 app = Flask(__name__)
-
-_secret_key = os.environ.get("FLASK_SECRET_KEY")
+_secret_key = os.environ.get("FLASK_SECRET_KEY", "change-me-in-production")
 app.config["SECRET_KEY"] = _secret_key
 
 socketio = SocketIO(
@@ -55,13 +52,17 @@ MAX_PREFETCH_PER_REQUEST = 10
 
 stream_url_cache = {}
 _cache_lock = threading.Lock()
-
 session_radio_seed = {}
 _seed_lock = threading.Lock()
 
-
 ytmusic = YTMusic()
 
+# ========== COOKIES CONFIG ==========
+# Priority: environment variable → cookies.txt next to the app
+COOKIES_FILE = os.environ.get("COOKIES_FILE") or os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), "cookies.txt"
+)
+# ====================================
 
 def _clean_stream_cache():
     while True:
@@ -72,7 +73,6 @@ def _clean_stream_cache():
                 expired = [k for k, (_, ts) in stream_url_cache.items() if now - ts >= CACHE_TIMEOUT]
                 for k in expired:
                     del stream_url_cache[k]
-
                 if len(stream_url_cache) > CACHE_MAX_ENTRIES:
                     by_age = sorted(stream_url_cache.items(), key=lambda kv: kv[1][1])
                     overflow = len(stream_url_cache) - CACHE_MAX_ENTRIES
@@ -88,18 +88,22 @@ def _clean_stream_cache():
 def index():
     return render_template("index.html")
 
+
 @app.route("/favicon.ico")
 def favicon():
     return "", 204
+
 
 @app.errorhandler(404)
 def not_found(_err):
     return jsonify({"error": "Not found"}), 404
 
+
 @app.errorhandler(500)
 def server_error(err):
     logger.exception("Unhandled server error: %s", err)
     return jsonify({"error": "Internal server error"}), 500
+
 
 @app.route("/stream/<path:stream_url>")
 def stream_audio(stream_url):
@@ -142,11 +146,11 @@ def stream_audio(stream_url):
         logger.exception("Unexpected streaming error")
         return jsonify({"error": "Failed to stream audio"}), 500
 
+
 @app.route("/search-suggestions", methods=["POST"])
 def search_suggestions():
     data = request.get_json(silent=True) or {}
     query = (data.get("query") or "").strip()
-
     if not query:
         return jsonify([])
     if len(query) > 200:
@@ -177,7 +181,6 @@ def search_suggestions():
         except Exception:
             logger.exception("Skipping malformed search result: %r", song)
             continue
-
     return jsonify(suggestions)
 
 
@@ -185,11 +188,13 @@ def search_suggestions():
 def handle_connect():
     logger.info("Client connected: %s", request.sid)
 
+
 @socketio.on("disconnect")
 def handle_disconnect(reason=None):
     logger.info("Client disconnected: %s", request.sid)
     with _seed_lock:
         session_radio_seed.pop(request.sid, None)
+
 
 @socketio.on_error_default
 def default_error_handler(e):
@@ -198,6 +203,7 @@ def default_error_handler(e):
         emit("song_error", {"error": "Something went wrong. Please try again."})
     except Exception:
         pass
+
 
 @socketio.on("play_song")
 def play_song(data):
@@ -310,11 +316,11 @@ def extend_queue(data):
     )
     emit("queue_extended", {"seed_video_id": seed_video_id, "tracks": tracks}, room=request.sid)
 
+
 @socketio.on("prefetch_tracks")
 def prefetch_tracks(data):
     if not isinstance(data, dict):
         return
-
     raw_ids = data.get("video_ids") or []
     if not isinstance(raw_ids, list):
         return
@@ -336,6 +342,7 @@ def prefetch_tracks(data):
     for video_id in video_ids:
         socketio.start_background_task(_prefetch_stream_url, video_id)
 
+
 def _prefetch_stream_url(video_id):
     try:
         video_url = f"https://music.youtube.com/watch?v={video_id}"
@@ -346,6 +353,7 @@ def _prefetch_stream_url(video_id):
         get_audio_stream_url(video_url)
     except Exception:
         logger.exception("Prefetch failed for video_id=%r", video_id)
+
 
 def _format_playlist_track(track):
     t_video_id = track.get("videoId")
@@ -359,6 +367,7 @@ def _format_playlist_track(track):
         "videoId": t_video_id,
         "thumbnailUrl": p_thumbnails[-1]["url"] if p_thumbnails else None,
     }
+
 
 def _get_radio_tracks(video_id, exclude_ids=None, limit=EXTEND_BATCH_SIZE):
     limit = max(1, min(int(limit or EXTEND_BATCH_SIZE), MAX_RADIO_BATCH))
@@ -383,6 +392,7 @@ def _get_radio_tracks(video_id, exclude_ids=None, limit=EXTEND_BATCH_SIZE):
         return []
     return tracks
 
+
 def search_youtube_music(query):
     try:
         search_results = ytmusic.search(query, filter="songs", limit=1)
@@ -402,6 +412,7 @@ def search_youtube_music(query):
     except Exception as e:
         logger.exception("Error searching for song %r", query)
         return None, None, None, None, f"Error searching for song: {e}", None
+
 
 def get_audio_stream_url(youtube_url):
     try:
@@ -434,13 +445,24 @@ def get_audio_stream_url(youtube_url):
                     "player_skip": ["webpage", "configs"],
                 }
             },
-            "js_runtimes": {"node": {}},
-            "remote_components": {"ejs": {"github": True}},
             "sleep_interval": 1,
             "sleep_interval_requests": 1,
             "max_sleep_interval": 5,
             "source_address": "0.0.0.0",
         }
+
+        # ========== COOKIES (THE KEY PART) ==========
+        if COOKIES_FILE and os.path.isfile(COOKIES_FILE):
+            ydl_opts["cookiefile"] = COOKIES_FILE
+            logger.info("Using cookies from %s", COOKIES_FILE)
+        else:
+            logger.warning(
+                "No cookies file found at %s. "
+                "YouTube will almost certainly require sign-in. "
+                "Export cookies from a private window and upload cookies.txt",
+                COOKIES_FILE,
+            )
+        # ============================================
 
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info_dict = ydl.extract_info(youtube_url, download=False)
@@ -477,5 +499,9 @@ def get_audio_stream_url(youtube_url):
     except Exception:
         logger.exception("Error getting audio stream URL for %s", youtube_url)
         return None
+
+
 if __name__ == "__main__":
-    socketio.run(app)
+    # Start cache cleaner
+    gevent.spawn(_clean_stream_cache)
+    socketio.run(app, host="0.0.0.0", port=int(os.environ.get("PORT", 10000)))
