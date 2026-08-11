@@ -50,6 +50,23 @@ EXTEND_BATCH_SIZE = 10
 MAX_RADIO_BATCH = 30
 MAX_PREFETCH_PER_REQUEST = 10
 
+# ---- PO Token provider config ----
+# Set POT_PROVIDER_URL to the base URL of a running bgutil-ytdlp-pot-provider
+# HTTP server (e.g. http://bgutil-pot-provider-xxxx:4416 for a Render private
+# service, or http://127.0.0.1:4416 for local dev). Leave unset to disable
+# PO Token support (extraction will fall back to client rotation only).
+POT_PROVIDER_URL = os.environ.get("POT_PROVIDER_URL", "").strip()
+
+# Ordered fallback lists of yt-dlp "player_client" values to try in sequence.
+# If one client's format list is empty/unavailable, we move to the next
+# instead of failing the whole request.
+CLIENT_FALLBACKS = [
+    ["android_vr", "tv_downgraded", "web", "mweb"],
+    ["ios"],
+    ["android"],
+    ["web_safari"],
+]
+
 stream_url_cache = {}
 _cache_lock = threading.Lock()
 session_radio_seed = {}
@@ -408,6 +425,42 @@ def search_youtube_music(query):
         return None, None, None, None, f"Error searching for song: {e}", None
 
 
+def _build_base_ydl_opts():
+    """Options shared across every extraction attempt (client list is added per-attempt)."""
+    opts = {
+        "format": "bestaudio/best",
+        "quiet": True,
+        "no_warnings": True,
+        "skip_download": True,
+        "noplaylist": True,
+        "extractor_retries": 5,
+        "retries": 5,
+        "fragment_retries": 5,
+        "socket_timeout": 20,
+        "http_headers": {
+            "User-Agent": random.choice(USER_AGENTS),
+            "Accept-Language": "en-US,en;q=0.9",
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        },
+        "sleep_interval": 1,
+        "sleep_interval_requests": 1,
+        "max_sleep_interval": 5,
+        "source_address": "0.0.0.0",
+    }
+
+    if POT_PROVIDER_URL:
+        # Tells the bgutil-ytdlp-pot-provider client plugin (installed via pip)
+        # where the running POT provider HTTP server lives, so yt-dlp can fetch
+        # a real PO Token instead of getting bot-checked / format-starved.
+        opts["extractor_args"] = {
+            "youtubepot-bgutilhttp": {"base_url": [POT_PROVIDER_URL]},
+        }
+    else:
+        opts["extractor_args"] = {}
+
+    return opts
+
+
 def get_audio_stream_url(youtube_url):
     try:
         current_time = time.time()
@@ -418,55 +471,56 @@ def get_audio_stream_url(youtube_url):
             if current_time - timestamp < CACHE_TIMEOUT:
                 return url
 
-        ydl_opts = {
-            # More flexible format selection (fixes "Requested format is not available")
-            "format": "bestaudio[ext=webm]/bestaudio[ext=m4a]/bestaudio/best",
-            "quiet": True,
-            "no_warnings": True,
-            "skip_download": True,
-            "noplaylist": True,
-            "extractor_retries": 5,
-            "retries": 5,
-            "fragment_retries": 5,
-            "socket_timeout": 20,
-            "http_headers": {
-                "User-Agent": random.choice(USER_AGENTS),
-                "Accept-Language": "en-US,en;q=0.9",
-                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-            },
-            "extractor_args": {
-                "youtube": {
-                    "player_client": ["android_vr", "tv_downgraded", "web", "mweb"],
-                    "player_skip": ["webpage", "configs"],
-                }
-            },
-            "sleep_interval": 1,
-            "sleep_interval_requests": 1,
-            "max_sleep_interval": 5,
-            "source_address": "0.0.0.0",
-        }
-
         # ========== Use COOKIES_CONTENT environment variable ==========
         cookies_content = os.environ.get("COOKIES_CONTENT")
         cookies_temp_file = None
 
         if cookies_content:
-            # Create a temporary cookies file
             cookies_temp_file = tempfile.NamedTemporaryFile(
                 mode="w", suffix=".txt", delete=False, encoding="utf-8"
             )
             cookies_temp_file.write(cookies_content)
             cookies_temp_file.close()
-            ydl_opts["cookiefile"] = cookies_temp_file.name
             logger.info("Using cookies from COOKIES_CONTENT environment variable")
         else:
             logger.warning("COOKIES_CONTENT environment variable is not set")
 
+        if not POT_PROVIDER_URL:
+            logger.warning(
+                "POT_PROVIDER_URL is not set - PO Token support is disabled. "
+                "Extraction will rely on client rotation only and may hit "
+                "'Requested format is not available' errors more often."
+            )
+
+        base_opts = _build_base_ydl_opts()
+        if cookies_temp_file:
+            base_opts["cookiefile"] = cookies_temp_file.name
+
+        info_dict = None
+        last_err = None
         try:
-            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                info_dict = ydl.extract_info(youtube_url, download=False)
+            for clients in CLIENT_FALLBACKS:
+                attempt_opts = dict(base_opts)
+                attempt_opts["extractor_args"] = dict(base_opts["extractor_args"])
+                attempt_opts["extractor_args"]["youtube"] = {"player_client": clients}
+
+                try:
+                    with yt_dlp.YoutubeDL(attempt_opts) as ydl:
+                        info_dict = ydl.extract_info(youtube_url, download=False)
+                    if info_dict:
+                        logger.debug(
+                            "Extraction succeeded for %s using clients=%s",
+                            youtube_url, clients
+                        )
+                        break
+                except Exception as e:
+                    last_err = e
+                    logger.warning(
+                        "Extraction attempt failed for %s with clients=%s: %s",
+                        youtube_url, clients, e
+                    )
+                    continue
         finally:
-            # Clean up temporary file
             if cookies_temp_file and os.path.exists(cookies_temp_file.name):
                 try:
                     os.unlink(cookies_temp_file.name)
@@ -474,7 +528,10 @@ def get_audio_stream_url(youtube_url):
                     pass
 
         if not info_dict:
-            logger.warning("No info returned for %s", youtube_url)
+            logger.warning(
+                "All client fallbacks failed for %s. Last error: %s",
+                youtube_url, last_err
+            )
             return None
 
         stream_url = info_dict.get("url")
