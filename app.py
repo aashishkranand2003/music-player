@@ -14,7 +14,7 @@ from flask_socketio import SocketIO, emit
 from ytmusicapi import YTMusic
 import yt_dlp  
 
-
+cookies_file = os.environ.get("COOKIES_FILE") or os.path.join(os.path.dirname(os.path.abspath(__file__)), "cookies.txt")
 
 logging.basicConfig(
     level=os.environ.get("LOG_LEVEL", "INFO"),
@@ -429,16 +429,10 @@ def get_audio_stream_url(youtube_url):
                 "Accept-Language": "en-US,en;q=0.9",
                 "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
             },
-
             "extractor_args": {
                 "youtube": {
-                    "player_client": [
-                        "android_vr",
-                        "tv_downgraded",
-                        "mweb",
-                        "web",
-                        "android",
-                    ],
+                    "player_client": ["android", "web", "mweb", "tv_downgraded"],
+                    "player_skip": ["webpage", "configs"],
                 }
             },
             "sleep_interval": 1,
@@ -446,6 +440,15 @@ def get_audio_stream_url(youtube_url):
             "max_sleep_interval": 5,
             "source_address": "0.0.0.0",
         }
+
+        if cookies_file and os.path.isfile(cookies_file):
+            ydl_opts["cookiefile"] = cookies_file
+            logger.debug("Using cookies from %s", cookies_file)
+        else:
+            logger.warning(
+                "No cookies file found at %s – YouTube will likely require sign-in. ",
+                cookies_file,
+            )
 
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info_dict = ydl.extract_info(youtube_url, download=False)
@@ -455,10 +458,8 @@ def get_audio_stream_url(youtube_url):
             return None
 
         stream_url = info_dict.get("url")
-
         if not stream_url:
             formats = info_dict.get("formats") or []
-
             audio_formats = [
                 f for f in formats
                 if f.get("acodec") != "none" and f.get("vcodec") in (None, "none")
@@ -466,7 +467,6 @@ def get_audio_stream_url(youtube_url):
             ]
             if not audio_formats:
                 audio_formats = [f for f in formats if f.get("url")]
-
             if audio_formats:
                 audio_formats.sort(
                     key=lambda f: f.get("abr") or f.get("tbr") or 0,
@@ -480,12 +480,10 @@ def get_audio_stream_url(youtube_url):
 
         with _cache_lock:
             stream_url_cache[youtube_url] = (stream_url, current_time)
-
         return stream_url
 
     except Exception:
         logger.exception("Error getting audio stream URL for %s", youtube_url)
         return None
-
 if __name__ == "__main__":
     socketio.run(app)
