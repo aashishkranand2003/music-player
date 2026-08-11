@@ -447,10 +447,6 @@ def get_audio_stream_url(youtube_url):
             "source_address": "0.0.0.0",
         }
 
-        if cookies_file and os.path.isfile(cookies_file):
-            ydl_opts["cookiefile"] = cookies_file
-            logger.debug("Using cookies from %s", cookies_file)
-
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info_dict = ydl.extract_info(youtube_url, download=False)
 
