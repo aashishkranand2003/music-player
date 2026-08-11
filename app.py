@@ -4,9 +4,11 @@ import socket
 import threading
 import time
 import random
-from urllib.parse import unquote, urlparse
+from urllib.parse import unquote, quote, urlparse
 import eventlet
 eventlet.monkey_patch()
+from eventlet import tpool
+from eventlet.semaphore import BoundedSemaphore
 import requests
 from flask import Flask, Response, jsonify, render_template, request
 from flask_socketio import SocketIO, emit
@@ -44,7 +46,8 @@ socketio = SocketIO(
     engineio_logger=False,
 )
 
-REQUEST_TIMEOUT = 150
+STREAM_CONNECT_TIMEOUT = 10
+STREAM_READ_TIMEOUT = 30
 CACHE_TIMEOUT = 500
 CACHE_MAX_ENTRIES = 50
 CACHE_CLEAN_INTERVAL = 300
@@ -52,6 +55,9 @@ INITIAL_QUEUE_SIZE = 30
 EXTEND_BATCH_SIZE = 10
 MAX_RADIO_BATCH = 30
 MAX_PREFETCH_PER_REQUEST = 10
+
+MAX_CONCURRENT_STREAMS = int(os.environ.get("MAX_CONCURRENT_STREAMS", "6"))
+_stream_slots = BoundedSemaphore(MAX_CONCURRENT_STREAMS)
 
 stream_url_cache = {}
 _cache_lock = threading.Lock()
@@ -107,23 +113,39 @@ def stream_audio(stream_url):
         decoded_url = unquote(stream_url)
     except Exception:
         return jsonify({"error": "Invalid stream url"}), 400
+        
+    if not _stream_slots.acquire(blocking=False):
+        logger.warning("Rejecting stream request: concurrent stream limit reached")
+        return jsonify({"error": "Server is busy, please try again shortly"}), 503
+
+    released = False
+
+    def release_once():
+        nonlocal released
+        if not released:
+            released = True
+            _stream_slots.release()
 
     try:
         headers = {"Range": request.headers.get("Range", "bytes=0-")}
         upstream = requests.get(
-            decoded_url, headers=headers, stream=True, timeout=REQUEST_TIMEOUT
+            decoded_url,
+            headers=headers,
+            stream=True,
+            timeout=(STREAM_CONNECT_TIMEOUT, STREAM_READ_TIMEOUT),
         )
         upstream.raise_for_status()
 
         def generate():
             try:
-                for chunk in upstream.iter_content(chunk_size=8192):
+                for chunk in upstream.iter_content(chunk_size=65536):
                     if chunk:
                         yield chunk
             except requests.exceptions.RequestException:
                 logger.warning("Upstream stream interrupted mid-transfer")
             finally:
                 upstream.close()
+                release_once()
 
         resp = Response(generate(), mimetype="audio/webm", status=upstream.status_code)
         if upstream.headers.get("Content-Range"):
@@ -134,12 +156,15 @@ def stream_audio(stream_url):
         return resp
     except requests.exceptions.Timeout:
         logger.warning("Streaming timed out for %s", decoded_url)
+        release_once()
         return jsonify({"error": "Streaming source timed out"}), 504
     except requests.exceptions.RequestException as e:
         logger.warning("Streaming request failed: %s", e)
+        release_once()
         return jsonify({"error": "Failed to stream audio"}), 502
     except Exception:
         logger.exception("Unexpected streaming error")
+        release_once()
         return jsonify({"error": "Failed to stream audio"}), 500
 
 @app.route("/search-suggestions", methods=["POST"])
@@ -153,7 +178,9 @@ def search_suggestions():
         return jsonify({"error": "Query too long"}), 400
 
     try:
-        results = ytmusic.search(query, filter="songs", limit=5) or []
+        # ytmusicapi does blocking network + JSON parsing; run it on a real
+        # OS thread so it can't stall the eventlet hub for other clients.
+        results = tpool.execute(ytmusic.search, query, filter="songs", limit=5) or []
     except Exception:
         logger.exception("search-suggestions failed for query=%r", query)
         return jsonify({"error": "Search is temporarily unavailable"}), 503
@@ -219,7 +246,7 @@ def play_song(data):
 
     if video_id:
         try:
-            song_info = ytmusic.get_song(video_id)
+            song_info = tpool.execute(ytmusic.get_song, video_id)
             details = song_info.get("videoDetails") or {}
             title = details.get("title") or "Unknown Title"
             artist_name = details.get("author") or "Unknown Artist"
@@ -236,8 +263,8 @@ def play_song(data):
         emit("song_error", {"error": error or "Song not found"}, room=request.sid)
         return
 
-    stream_url = get_audio_stream_url(video_url)
-    if not stream_url:
+    direct_stream_url = get_audio_stream_url(video_url)
+    if not direct_stream_url:
         emit("song_error", {"error": "Failed to get audio stream URL"}, room=request.sid)
         return
 
@@ -257,7 +284,7 @@ def play_song(data):
             )
 
     song_data = {
-        "stream_url": stream_url,
+        "stream_url": f"/stream/{quote(direct_stream_url, safe='')}",
         "thumbnail_url": thumbnail_url,
         "song_title": title,
         "artist": artist_name,
@@ -365,7 +392,9 @@ def _get_radio_tracks(video_id, exclude_ids=None, limit=EXTEND_BATCH_SIZE):
     seen = set(exclude_ids or ())
     tracks = []
     try:
-        watch_playlist = ytmusic.get_watch_playlist(videoId=video_id, limit=limit + len(seen) + 1)
+        watch_playlist = tpool.execute(
+            ytmusic.get_watch_playlist, videoId=video_id, limit=limit + len(seen) + 1
+        )
         for track in (watch_playlist.get("tracks") or []):
             try:
                 formatted = _format_playlist_track(track)
@@ -385,7 +414,7 @@ def _get_radio_tracks(video_id, exclude_ids=None, limit=EXTEND_BATCH_SIZE):
 
 def search_youtube_music(query):
     try:
-        search_results = ytmusic.search(query, filter="songs", limit=1)
+        search_results = tpool.execute(ytmusic.search, query, filter="songs", limit=1)
         if not search_results:
             return None, None, None, None, "No results found for the query", None
         result = search_results[0]
@@ -402,6 +431,10 @@ def search_youtube_music(query):
     except Exception as e:
         logger.exception("Error searching for song %r", query)
         return None, None, None, None, f"Error searching for song: {e}", None
+
+def _extract_info_blocking(youtube_url, ydl_opts):
+    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+        return ydl.extract_info(youtube_url, download=False)
 
 def get_audio_stream_url(youtube_url):
     try:
@@ -430,8 +463,7 @@ def get_audio_stream_url(youtube_url):
             "sleep_interval_requests": 1,
             "max_sleep_interval": 5,
         }
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info_dict = ydl.extract_info(youtube_url, download=False)
+        info_dict = tpool.execute(_extract_info_blocking, youtube_url, ydl_opts)
 
         stream_url = info_dict.get("url") if info_dict else None
 
@@ -449,5 +481,3 @@ def get_audio_stream_url(youtube_url):
 if __name__ == "__main__":
     threading.Thread(target=_clean_stream_cache, daemon=True).start()
     socketio.run(app)
-
-
