@@ -434,8 +434,8 @@ def get_audio_stream_url(youtube_url):
                     "player_skip": ["webpage", "configs"],
                 }
             },
-            "js_runtimes": ["node"],
-            "remote_components": ["ejs:github"],
+            "js_runtimes": {"node": {}},
+            "remote_components": {"ejs": {"github": True}},
             "sleep_interval": 1,
             "sleep_interval_requests": 1,
             "max_sleep_interval": 5,
