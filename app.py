@@ -57,12 +57,30 @@ _seed_lock = threading.Lock()
 
 ytmusic = YTMusic()
 
-# ========== COOKIES CONFIG ==========
-# Priority: environment variable → cookies.txt next to the app
-COOKIES_FILE = os.environ.get("COOKIES_FILE") or os.path.join(
-    os.path.dirname(os.path.abspath(__file__)), "cookies.txt"
-)
-# ====================================
+# ========== COOKIES SETUP (Method 2) ==========
+COOKIES_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "cookies.txt")
+
+def setup_cookies():
+    """Create cookies.txt from environment variable if it doesn't exist"""
+    if os.path.isfile(COOKIES_FILE):
+        logger.info("cookies.txt already exists")
+        return
+
+    cookies_content = os.environ.get("COOKIES_CONTENT")
+    if cookies_content:
+        try:
+            with open(COOKIES_FILE, "w", encoding="utf-8") as f:
+                f.write(cookies_content)
+            logger.info("Successfully created cookies.txt from COOKIES_CONTENT environment variable")
+        except Exception as e:
+            logger.error("Failed to write cookies.txt: %s", e)
+    else:
+        logger.warning("COOKIES_CONTENT environment variable is not set")
+
+# Run this when the app starts
+setup_cookies()
+# ==============================================
+
 
 def _clean_stream_cache():
     while True:
@@ -451,18 +469,12 @@ def get_audio_stream_url(youtube_url):
             "source_address": "0.0.0.0",
         }
 
-        # ========== COOKIES (THE KEY PART) ==========
-        if COOKIES_FILE and os.path.isfile(COOKIES_FILE):
+        # Use cookies
+        if os.path.isfile(COOKIES_FILE):
             ydl_opts["cookiefile"] = COOKIES_FILE
             logger.info("Using cookies from %s", COOKIES_FILE)
         else:
-            logger.warning(
-                "No cookies file found at %s. "
-                "YouTube will almost certainly require sign-in. "
-                "Export cookies from a private window and upload cookies.txt",
-                COOKIES_FILE,
-            )
-        # ============================================
+            logger.warning("cookies.txt not found")
 
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info_dict = ydl.extract_info(youtube_url, download=False)
@@ -502,6 +514,5 @@ def get_audio_stream_url(youtube_url):
 
 
 if __name__ == "__main__":
-    # Start cache cleaner
     gevent.spawn(_clean_stream_cache)
     socketio.run(app, host="0.0.0.0", port=int(os.environ.get("PORT", 10000)))
