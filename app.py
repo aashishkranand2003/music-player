@@ -14,7 +14,6 @@ from flask_socketio import SocketIO, emit
 from ytmusicapi import YTMusic
 import yt_dlp  
 
-cookies_file = os.environ.get("COOKIES_FILE") or os.path.join(os.path.dirname(os.path.abspath(__file__)), "cookies.txt")
 
 logging.basicConfig(
     level=os.environ.get("LOG_LEVEL", "INFO"),
@@ -440,15 +439,6 @@ def get_audio_stream_url(youtube_url):
             "max_sleep_interval": 5,
             "source_address": "0.0.0.0",
         }
-
-        if cookies_file and os.path.isfile(cookies_file):
-            ydl_opts["cookiefile"] = cookies_file
-            logger.debug("Using cookies from %s", cookies_file)
-        else:
-            logger.warning(
-                "No cookies file found at %s – YouTube will likely require sign-in. ",
-                cookies_file,
-            )
 
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info_dict = ydl.extract_info(youtube_url, download=False)
