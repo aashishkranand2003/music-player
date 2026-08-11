@@ -1365,12 +1365,10 @@
       updateSongInfo(song);
       updateMobileUpNext();
 
-      // The backend always returns a same-origin "/stream/..." proxy path
-      // now, never a raw googlevideo CDN url. Those CDN urls are bound to the
-      // server's IP, so handing one straight to the browser to fetch itself
-      // would usually fail with a 403 (browser IP != server IP). Just use
-      // whatever the server sent us as-is.
-      audioPlayer.src = song.stream_url;
+      const streamUrl = typeof song.stream_url === 'string' && song.stream_url.startsWith('http')
+        ? song.stream_url
+        : `/stream/${encodeURIComponent(song.stream_url)}`;
+      audioPlayer.src = streamUrl;
       audioPlayer.addEventListener('canplay', function onCanPlay() {
         audioPlayer.removeEventListener('canplay', onCanPlay);
         if (shouldAutoplay) {
