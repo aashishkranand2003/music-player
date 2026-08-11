@@ -413,15 +413,6 @@ def get_audio_stream_url(youtube_url):
             url, timestamp = cached
             if current_time - timestamp < CACHE_TIMEOUT:
                 return url
-        proxy = None
-        proxies_env = os.environ.get("YTDLP_PROXIES") or os.environ.get("YTDLP_PROXY")
-        if proxies_env:
-            proxy_list = [p.strip() for p in proxies_env.split(",") if p.strip()]
-            if proxy_list:
-                proxy = random.choice(proxy_list)
-                logger.debug("Using proxy: %s", proxy.split("@")[-1] if "@" in proxy else proxy)
-
-        cookies_file = os.environ.get("YTDLP_COOKIES")
 
         ydl_opts = {
             "format": "bestaudio/best",
@@ -432,12 +423,13 @@ def get_audio_stream_url(youtube_url):
             "extractor_retries": 3,
             "retries": 3,
             "fragment_retries": 3,
-            "socket_timeout": 20,
+            "socket_timeout": 15,
             "http_headers": {
                 "User-Agent": random.choice(USER_AGENTS),
                 "Accept-Language": "en-US,en;q=0.9",
                 "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
             },
+
             "extractor_args": {
                 "youtube": {
                     "player_client": [
@@ -452,10 +444,8 @@ def get_audio_stream_url(youtube_url):
             "sleep_interval": 1,
             "sleep_interval_requests": 1,
             "max_sleep_interval": 5,
+            "source_address": "0.0.0.0",
         }
-
-        if proxy:
-            ydl_opts["proxy"] = proxy
 
         if cookies_file and os.path.isfile(cookies_file):
             ydl_opts["cookiefile"] = cookies_file
@@ -472,10 +462,10 @@ def get_audio_stream_url(youtube_url):
 
         if not stream_url:
             formats = info_dict.get("formats") or []
+
             audio_formats = [
                 f for f in formats
-                if f.get("acodec") != "none"
-                and f.get("vcodec") in (None, "none")
+                if f.get("acodec") != "none" and f.get("vcodec") in (None, "none")
                 and f.get("url")
             ]
             if not audio_formats:
