@@ -50,8 +50,25 @@ EXTEND_BATCH_SIZE = 10
 MAX_RADIO_BATCH = 30
 MAX_PREFETCH_PER_REQUEST = 10
 
+# ---- PO Token provider config ----
+# Set POT_PROVIDER_URL to the base URL of a running bgutil-ytdlp-pot-provider
+# HTTP server (e.g. http://bgutil-pot-provider-xxxx:4416 for a Render private
+# service, or http://127.0.0.1:4416 for local dev). Leave unset to disable
+# PO Token support (extraction will fall back to client rotation only).
 POT_PROVIDER_URL = os.environ.get("POT_PROVIDER_URL", "").strip()
 
+# Ordered fallback lists of yt-dlp "player_client" values to try in sequence.
+# If one client's format list is empty/unavailable, we move to the next
+# instead of failing the whole request.
+#
+# NOTE: android_vr/tv_downgraded/android are native-app clients - they don't
+# require JS signature/n-challenge solving at all (that's a web/mweb/tv-only
+# requirement), so they work with no JS runtime installed as long as cookies
+# are present. Tried first since they're the lowest-dependency option.
+# tv/web/mweb need a JS challenge solver (deno, or a plugin like ytdlp-jsc)
+# to decrypt formats - without one they'll only return storyboard thumbnails.
+# web_safari is currently SABR-blocked regardless of JS solving, so it's
+# dropped from this list entirely.
 CLIENT_FALLBACKS = [
     ["android_vr", "tv_downgraded"],
     ["android"],
@@ -428,15 +445,15 @@ def _build_base_ydl_opts():
         "retries": 5,
         "fragment_retries": 5,
         "socket_timeout": 20,
-        "http_headers": {
-            "User-Agent": random.choice(USER_AGENTS),
-            "Accept-Language": "en-US,en;q=0.9",
-            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-        },
+        # No custom http_headers/User-Agent here on purpose: overriding it
+        # globally clobbers the per-client headers yt-dlp sets internally for
+        # app clients like android_vr/tv_downgraded, which caused those
+        # clients to silently return no usable formats even though the same
+        # request worked fine from the plain CLI (which uses yt-dlp's
+        # defaults). Let yt-dlp manage headers per-client.
         "sleep_interval": 1,
         "sleep_interval_requests": 1,
         "max_sleep_interval": 5,
-        "source_address": "0.0.0.0",
     }
 
     if POT_PROVIDER_URL:
