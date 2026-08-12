@@ -21,10 +21,11 @@ logging.basicConfig(
 logger = logging.getLogger("music_player")
 
 USER_AGENTS = [
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 ",
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 ",
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0",
-    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 ",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36",
 ]
 
 app = Flask(__name__)
@@ -52,9 +53,9 @@ MAX_PREFETCH_PER_REQUEST = 10
 POT_PROVIDER_URL = os.environ.get("POT_PROVIDER_URL", "").strip()
 
 CLIENT_FALLBACKS = [
-    ["tv", "web", "mweb"],
-    ["tv_embedded"],
     ["android_vr", "tv_downgraded"],
+    ["android"],
+    ["tv", "web", "mweb"],
 ]
 
 stream_url_cache = {}
@@ -439,11 +440,20 @@ def _build_base_ydl_opts():
     }
 
     if POT_PROVIDER_URL:
+        # Tells the bgutil-ytdlp-pot-provider client plugin (installed via pip)
+        # where the running POT provider HTTP server lives, so yt-dlp can fetch
+        # a real PO Token instead of getting bot-checked / format-starved.
         opts["extractor_args"] = {
             "youtubepot-bgutilhttp": {"base_url": [POT_PROVIDER_URL]},
         }
     else:
         opts["extractor_args"] = {}
+
+    # Safety net: if a client's formats would normally be skipped for lacking
+    # a verified PO Token (SABR-only rollout), include them anyway rather than
+    # failing extraction outright. These formats *may* 403 at playback time,
+    # but that's caught and logged by /stream rather than blocking selection
+    # entirely. Merged into the per-attempt "youtube" args below.
     opts["_youtube_base_args"] = {"formats": "missing_pot"}
 
     return opts
@@ -459,6 +469,7 @@ def get_audio_stream_url(youtube_url):
             if current_time - timestamp < CACHE_TIMEOUT:
                 return url
 
+        # ========== Use COOKIES_CONTENT environment variable ==========
         cookies_content = os.environ.get("COOKIES_CONTENT")
         cookies_temp_file = None
 
