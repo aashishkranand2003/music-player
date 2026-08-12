@@ -7,4 +7,3 @@ yt-dlp
 requests
 gunicorn
 bgutil-ytdlp-pot-provider
-ytdlp-jsc
