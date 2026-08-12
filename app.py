@@ -50,21 +50,13 @@ EXTEND_BATCH_SIZE = 10
 MAX_RADIO_BATCH = 30
 MAX_PREFETCH_PER_REQUEST = 10
 
-# ---- PO Token provider config ----
-# Set POT_PROVIDER_URL to the base URL of a running bgutil-ytdlp-pot-provider
-# HTTP server (e.g. http://bgutil-pot-provider-xxxx:4416 for a Render private
-# service, or http://127.0.0.1:4416 for local dev). Leave unset to disable
-# PO Token support (extraction will fall back to client rotation only).
 POT_PROVIDER_URL = os.environ.get("POT_PROVIDER_URL", "").strip()
 
-# Ordered fallback lists of yt-dlp "player_client" values to try in sequence.
-# If one client's format list is empty/unavailable, we move to the next
-# instead of failing the whole request.
 CLIENT_FALLBACKS = [
-    ["android_vr", "tv_downgraded", "web", "mweb"],
-    ["ios"],
-    ["android"],
+    ["tv", "web", "mweb"],
+    ["tv_embedded"],
     ["web_safari"],
+    ["android_vr", "tv_downgraded"],
 ]
 
 stream_url_cache = {}
@@ -449,14 +441,12 @@ def _build_base_ydl_opts():
     }
 
     if POT_PROVIDER_URL:
-        # Tells the bgutil-ytdlp-pot-provider client plugin (installed via pip)
-        # where the running POT provider HTTP server lives, so yt-dlp can fetch
-        # a real PO Token instead of getting bot-checked / format-starved.
         opts["extractor_args"] = {
             "youtubepot-bgutilhttp": {"base_url": [POT_PROVIDER_URL]},
         }
     else:
         opts["extractor_args"] = {}
+    opts["_youtube_base_args"] = {"formats": "missing_pot"}
 
     return opts
 
@@ -471,7 +461,6 @@ def get_audio_stream_url(youtube_url):
             if current_time - timestamp < CACHE_TIMEOUT:
                 return url
 
-        # ========== Use COOKIES_CONTENT environment variable ==========
         cookies_content = os.environ.get("COOKIES_CONTENT")
         cookies_temp_file = None
 
@@ -499,10 +488,14 @@ def get_audio_stream_url(youtube_url):
         info_dict = None
         last_err = None
         try:
+            youtube_base_args = base_opts.pop("_youtube_base_args", {})
             for clients in CLIENT_FALLBACKS:
                 attempt_opts = dict(base_opts)
                 attempt_opts["extractor_args"] = dict(base_opts["extractor_args"])
-                attempt_opts["extractor_args"]["youtube"] = {"player_client": clients}
+                attempt_opts["extractor_args"]["youtube"] = {
+                    **youtube_base_args,
+                    "player_client": clients,
+                }
 
                 try:
                     with yt_dlp.YoutubeDL(attempt_opts) as ydl:
