@@ -57,22 +57,9 @@ MAX_PREFETCH_PER_REQUEST = 10
 # PO Token support (extraction will fall back to client rotation only).
 POT_PROVIDER_URL = os.environ.get("POT_PROVIDER_URL", "").strip()
 
-# Ordered fallback lists of yt-dlp "player_client" values to try in sequence.
-# If one client's format list is empty/unavailable, we move to the next
-# instead of failing the whole request.
-#
-# NOTE: android_vr/tv_downgraded/android are native-app clients - they don't
-# require JS signature/n-challenge solving at all (that's a web/mweb/tv-only
-# requirement), so they work with no JS runtime installed as long as cookies
-# are present. Tried first since they're the lowest-dependency option.
-# tv/web/mweb need a JS challenge solver (deno, or a plugin like ytdlp-jsc)
-# to decrypt formats - without one they'll only return storyboard thumbnails.
-# web_safari is currently SABR-blocked regardless of JS solving, so it's
-# dropped from this list entirely.
 CLIENT_FALLBACKS = [
-    ["android_vr", "tv_downgraded"],
-    ["android"],
-    ["tv", "web", "mweb"],
+    ["android_vr"],
+    ["android"]
 ]
 
 stream_url_cache = {}
