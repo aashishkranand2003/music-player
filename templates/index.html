@@ -1365,9 +1365,7 @@
       updateSongInfo(song);
       updateMobileUpNext();
 
-      const streamUrl = typeof song.stream_url === 'string' && song.stream_url.startsWith('http')
-        ? song.stream_url
-        : `/stream/${encodeURIComponent(song.stream_url)}`;
+      const streamUrl = `/stream/${encodeURIComponent(song.stream_url)}`;
       audioPlayer.src = streamUrl;
       audioPlayer.addEventListener('canplay', function onCanPlay() {
         audioPlayer.removeEventListener('canplay', onCanPlay);
