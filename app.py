@@ -57,6 +57,14 @@ MAX_PREFETCH_PER_REQUEST = 10
 # PO Token support (extraction will fall back to client rotation only).
 POT_PROVIDER_URL = os.environ.get("POT_PROVIDER_URL", "").strip()
 
+# ---- Outbound proxy config ----
+# Ensures the yt-dlp extraction request and the later /stream/ proxy request
+# both egress from the same IP. Without this, Railway's load-balanced outbound
+# IPs can differ between the two calls, and YouTube's CDN 403s because the
+# signed stream URL is locked to whichever IP fetched it.
+# Format: http://username:password@proxy-host:port
+PROXY_URL = os.environ.get("PROXY_URL", "").strip()
+
 CLIENT_FALLBACKS = [
     ["android_vr"],
     ["android"]
@@ -120,8 +128,10 @@ def stream_audio(stream_url):
 
     try:
         headers = {"Range": request.headers.get("Range", "bytes=0-")}
+        proxies = {"http": PROXY_URL, "https": PROXY_URL} if PROXY_URL else None
         upstream = requests.get(
-            decoded_url, headers=headers, stream=True, timeout=REQUEST_TIMEOUT
+            decoded_url, headers=headers, stream=True, timeout=REQUEST_TIMEOUT,
+            proxies=proxies,
         )
         upstream.raise_for_status()
 
@@ -443,6 +453,12 @@ def _build_base_ydl_opts():
         "max_sleep_interval": 5,
     }
 
+    if PROXY_URL:
+        # Route yt-dlp's own extraction requests through the same proxy used
+        # by /stream, so the IP baked into the signed googlevideo URL matches
+        # the IP that later fetches it.
+        opts["proxy"] = PROXY_URL
+
     if POT_PROVIDER_URL:
         # Tells the bgutil-ytdlp-pot-provider client plugin (installed via pip)
         # where the running POT provider HTTP server lives, so yt-dlp can fetch
@@ -492,6 +508,13 @@ def get_audio_stream_url(youtube_url):
                 "POT_PROVIDER_URL is not set - PO Token support is disabled. "
                 "Extraction will rely on client rotation only and may hit "
                 "'Requested format is not available' errors more often."
+            )
+
+        if not PROXY_URL:
+            logger.debug(
+                "PROXY_URL is not set - extraction and /stream requests may "
+                "egress from different IPs on platforms with load-balanced "
+                "outbound networking, which can cause 403s from googlevideo."
             )
 
         base_opts = _build_base_ydl_opts()
