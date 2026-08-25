@@ -66,8 +66,9 @@ POT_PROVIDER_URL = os.environ.get("POT_PROVIDER_URL", "").strip()
 PROXY_URL = os.environ.get("PROXY_URL", "").strip()
 
 CLIENT_FALLBACKS = [
-    ["android"],
-    ["android_vr"]
+    ["tv", "web", "mweb"],
+    ["android_vr", "tv_downgraded"],
+    ["android"]
 ]
 
 stream_url_cache = {}
