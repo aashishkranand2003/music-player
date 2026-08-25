@@ -55,24 +55,34 @@ MAX_PREFETCH_PER_REQUEST = 10
 # HTTP server (e.g. http://bgutil-pot-provider-xxxx:4416 for a Render private
 # service, or http://127.0.0.1:4416 for local dev). Leave unset to disable
 # PO Token support (extraction will fall back to client rotation only).
+# NOTE: also requires the `bgutil-ytdlp-pot-provider` pip package installed
+# alongside yt-dlp in THIS app's environment - see the setup guide.
 POT_PROVIDER_URL = os.environ.get("POT_PROVIDER_URL", "").strip()
 
-# Ordered fallback lists of yt-dlp "player_client" values to try in sequence.
-# If one client's format list is empty/unavailable, we move to the next
-# instead of failing the whole request.
+# ---- Optional outbound proxy ----
+# Set PROXY_URL (e.g. http://user:pass@host:port) to route yt-dlp's
+# extraction requests through a residential/mobile proxy instead of this
+# server's own IP. Datacenter IPs (Render, most VPS/cloud hosts) get the
+# strictest scrutiny from YouTube's bot check, and no client/cookie tweak
+# fully compensates for that - a proxy is the most durable fix if you keep
+# getting flagged specifically from this deployment. Leave unset to disable.
+PROXY_URL = os.environ.get("PROXY_URL", "").strip()
+
+# Ordered fallback attempts of yt-dlp "player_client" values to try in
+# sequence. Each entry also controls whether cookies get attached to that
+# attempt - pairing cookies with the `tv` client risks invalidating the
+# cookie session, so `tv` is tried cookie-less first.
 #
-# NOTE: android_vr/tv_downgraded/android are native-app clients - they don't
-# require JS signature/n-challenge solving at all (that's a web/mweb/tv-only
-# requirement), so they work with no JS runtime installed as long as cookies
-# are present. Tried first since they're the lowest-dependency option.
-# tv/web/mweb need a JS challenge solver (deno, or a plugin like ytdlp-jsc)
-# to decrypt formats - without one they'll only return storyboard thumbnails.
-# web_safari is currently SABR-blocked regardless of JS solving, so it's
-# dropped from this list entirely.
+# IMPORTANT: which clients work shifts every few months as YouTube adjusts
+# enforcement. If this list stops working, check
+# https://github.com/yt-dlp/yt-dlp/wiki/Extractors for the current
+# recommended client(s) and update the list below - don't assume the
+# ordering here is permanent.
 CLIENT_FALLBACKS = [
-    ["android_vr", "tv_downgraded"],
-    ["android"],
-    ["tv", "web", "mweb"],
+    {"clients": ["tv"], "use_cookies": False},
+    {"clients": ["android_vr", "tv_downgraded"], "use_cookies": True},
+    {"clients": ["android"], "use_cookies": True},
+    {"clients": ["web_safari", "web", "mweb"], "use_cookies": True},
 ]
 
 stream_url_cache = {}
@@ -434,7 +444,8 @@ def search_youtube_music(query):
 
 
 def _build_base_ydl_opts():
-    """Options shared across every extraction attempt (client list is added per-attempt)."""
+    """Options shared across every extraction attempt (client list + cookies
+    are added per-attempt in get_audio_stream_url)."""
     opts = {
         "format": "bestaudio/best",
         "quiet": True,
@@ -473,6 +484,9 @@ def _build_base_ydl_opts():
     # entirely. Merged into the per-attempt "youtube" args below.
     opts["_youtube_base_args"] = {"formats": "missing_pot"}
 
+    if PROXY_URL:
+        opts["proxy"] = PROXY_URL
+
     return opts
 
 
@@ -506,37 +520,46 @@ def get_audio_stream_url(youtube_url):
                 "Extraction will rely on client rotation only and may hit "
                 "'Requested format is not available' errors more often."
             )
+        if not PROXY_URL:
+            logger.debug(
+                "PROXY_URL is not set - extraction requests go out on this "
+                "server's own IP, which gets stricter bot-check scrutiny if "
+                "it's a datacenter host."
+            )
 
         base_opts = _build_base_ydl_opts()
-        if cookies_temp_file:
-            base_opts["cookiefile"] = cookies_temp_file.name
 
         info_dict = None
         last_err = None
         try:
             youtube_base_args = base_opts.pop("_youtube_base_args", {})
-            for clients in CLIENT_FALLBACKS:
+            for attempt in CLIENT_FALLBACKS:
+                clients = attempt["clients"]
+                use_cookies = attempt.get("use_cookies", True)
+
                 attempt_opts = dict(base_opts)
                 attempt_opts["extractor_args"] = dict(base_opts["extractor_args"])
                 attempt_opts["extractor_args"]["youtube"] = {
                     **youtube_base_args,
                     "player_client": clients,
                 }
+                if use_cookies and cookies_temp_file:
+                    attempt_opts["cookiefile"] = cookies_temp_file.name
 
                 try:
                     with yt_dlp.YoutubeDL(attempt_opts) as ydl:
                         info_dict = ydl.extract_info(youtube_url, download=False)
                     if info_dict:
                         logger.debug(
-                            "Extraction succeeded for %s using clients=%s",
-                            youtube_url, clients
+                            "Extraction succeeded for %s using clients=%s (cookies=%s)",
+                            youtube_url, clients, use_cookies and bool(cookies_temp_file)
                         )
                         break
                 except Exception as e:
                     last_err = e
                     logger.warning(
-                        "Extraction attempt failed for %s with clients=%s: %s",
-                        youtube_url, clients, e
+                        "Extraction attempt failed for %s with clients=%s (cookies=%s): %s",
+                        youtube_url, clients, use_cookies and bool(cookies_temp_file), e
                     )
                     continue
         finally:
