@@ -8,3 +8,4 @@ requests
 gunicorn
 bgutil-ytdlp-pot-provider
 packaging
+yt-dlp-ejs
