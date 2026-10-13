@@ -1,10 +1,11 @@
 import logging
 import os
+import secrets
 import tempfile
 import threading
 import time
 import random
-from urllib.parse import unquote
+from urllib.parse import unquote, urlparse
 from gevent import monkey
 monkey.patch_all()
 import gevent
@@ -29,26 +30,33 @@ USER_AGENTS = [
 ]
 
 app = Flask(__name__)
-_secret_key = os.environ.get("FLASK_SECRET_KEY", "change-me-in-production")
+_secret_key = os.environ.get("FLASK_SECRET_KEY") or secrets.token_hex(32)
 app.config["SECRET_KEY"] = _secret_key
+app.config["MAX_CONTENT_LENGTH"] = 16 * 1024
 
 socketio = SocketIO(
     app,
     async_mode="gevent",
-    cors_allowed_origins=os.environ.get("CORS_ALLOWED_ORIGINS", "*"),
+    cors_allowed_origins=os.environ.get("CORS_ALLOWED_ORIGINS") or None,
     manage_session=False,
     logger=False,
     engineio_logger=False,
 )
 
-REQUEST_TIMEOUT = 15
-CACHE_TIMEOUT = 500
-CACHE_MAX_ENTRIES = 50
-CACHE_CLEAN_INTERVAL = 300
+REQUEST_TIMEOUT = float(os.environ.get("REQUEST_TIMEOUT", "15"))
+CACHE_TIMEOUT = int(os.environ.get("CACHE_TIMEOUT", "500"))
+CACHE_MAX_ENTRIES = int(os.environ.get("CACHE_MAX_ENTRIES", "50"))
+CACHE_CLEAN_INTERVAL = int(os.environ.get("CACHE_CLEAN_INTERVAL", "300"))
 INITIAL_QUEUE_SIZE = 30
 EXTEND_BATCH_SIZE = 10
 MAX_RADIO_BATCH = 30
 MAX_PREFETCH_PER_REQUEST = 10
+MAX_QUERY_LENGTH = 200
+STREAM_HOST_SUFFIXES = (
+    ".googlevideo.com",
+    ".googleusercontent.com",
+    ".youtube.com",
+)
 
 # ---- PO Token provider config ----
 # Set POT_PROVIDER_URL to the base URL of a running bgutil-ytdlp-pot-provider
@@ -99,9 +107,30 @@ def _clean_stream_cache():
             logger.exception("Error while cleaning stream cache")
 
 
+def _is_allowed_stream_url(stream_url):
+    try:
+        parsed = urlparse(stream_url)
+        hostname = (parsed.hostname or "").lower().rstrip(".")
+    except ValueError:
+        return False
+    return (
+        parsed.scheme == "https"
+        and bool(hostname)
+        and any(hostname.endswith(suffix) for suffix in STREAM_HOST_SUFFIXES)
+    )
+
+
+socketio.start_background_task(_clean_stream_cache)
+
+
 @app.route("/")
 def index():
     return render_template("index.html")
+
+
+@app.route("/healthz")
+def healthz():
+    return jsonify({"status": "ok"}), 200
 
 
 @app.route("/favicon.ico")
@@ -127,12 +156,23 @@ def stream_audio(stream_url):
     except Exception:
         return jsonify({"error": "Invalid stream url"}), 400
 
+    if not _is_allowed_stream_url(decoded_url):
+        logger.warning("Rejected unsupported stream host: %s", decoded_url[:200])
+        return jsonify({"error": "Unsupported streaming source"}), 400
+
     try:
-        headers = {"Range": request.headers.get("Range", "bytes=0-")}
+        headers = {}
+        requested_range = request.headers.get("Range")
+        if requested_range:
+            headers["Range"] = requested_range
         proxies = {"http": PROXY_URL, "https": PROXY_URL} if PROXY_URL else None
         upstream = requests.get(
-            decoded_url, headers=headers, stream=True, timeout=REQUEST_TIMEOUT,
+            decoded_url,
+            headers=headers,
+            stream=True,
+            timeout=REQUEST_TIMEOUT,
             proxies=proxies,
+            allow_redirects=False,
         )
         upstream.raise_for_status()
 
@@ -146,12 +186,15 @@ def stream_audio(stream_url):
             finally:
                 upstream.close()
 
-        resp = Response(generate(), mimetype="audio/webm", status=upstream.status_code)
+        content_type = upstream.headers.get("Content-Type", "audio/webm")
+        resp = Response(generate(), content_type=content_type, status=upstream.status_code)
         if upstream.headers.get("Content-Range"):
             resp.headers["Content-Range"] = upstream.headers["Content-Range"]
         resp.headers["Accept-Ranges"] = "bytes"
         if upstream.headers.get("Content-Length"):
             resp.headers["Content-Length"] = upstream.headers["Content-Length"]
+        resp.headers["Cache-Control"] = "no-store"
+        resp.headers["X-Content-Type-Options"] = "nosniff"
         return resp
     except requests.exceptions.Timeout:
         logger.warning("Streaming timed out for %s", decoded_url)
@@ -170,7 +213,7 @@ def search_suggestions():
     query = (data.get("query") or "").strip()
     if not query:
         return jsonify([])
-    if len(query) > 200:
+    if len(query) > MAX_QUERY_LENGTH:
         return jsonify({"error": "Query too long"}), 400
 
     try:
@@ -595,5 +638,4 @@ def get_audio_stream_url(youtube_url):
 
 
 if __name__ == "__main__":
-    gevent.spawn(_clean_stream_cache)
     socketio.run(app, host="0.0.0.0", port=int(os.environ.get("PORT", 10000)))
